@@ -41,7 +41,7 @@
                 </svg>
                 Sign up with Google
               </span>
-              <span v-else class="loading-dots">Redirecting<span>.</span><span>.</span><span>.</span></span>
+              <span v-else class="loading-dots">Signing up<span>.</span><span>.</span><span>.</span></span>
             </button>
 
             <div class="divider">
@@ -203,32 +203,28 @@
 
 <script>
 import api from '../api'
-
-const ROLE_KEY = 'signup_role'
+import { auth, provider, signInWithGoogle, handleRedirectResult } from '../firebase'
 
 export default {
   name: 'SignupPage',
   data() {
     return {
-      step:    'choose',   // 'choose' | 'details'
-      role:    'client',
+      step: 'choose',
+      role: 'client',
       loading: false,
-      error:   '',
-
+      error: '',
+      isRedirecting: false,
       googleData: {
         google_id: '',
-        email:     '',
-        name:      '',
-        picture:   ''
+        email: '',
+        name: '',
+        picture: ''
       },
-
-      // Profile fields
-      phone:          '',
+      phone: '',
       specialization: '',
-      experience:     '',
+      experience: '',
       certifications: '',
-      bio:            '',
-
+      bio: '',
       features: [
         { icon: '🧘', text: 'Expert Trainers' },
         { icon: '📅', text: 'Flexible Scheduling' },
@@ -247,169 +243,144 @@ export default {
       return true
     }
   },
-  mounted() {
-    // If already logged in, redirect
+  async mounted() {
     const token = localStorage.getItem('token')
-    const role  = localStorage.getItem('userRole')
+    const role = localStorage.getItem('userRole')
     if (token && role) {
       this.redirectToDashboard(role)
       return
     }
-
-    // Check if we were prefilled from the login page (user had no account)
+    
     const q = this.$route.query
     if (q.prefill_google_id) {
       this.googleData = {
         google_id: q.prefill_google_id,
-        email:     q.prefill_email     || '',
-        name:      q.prefill_name      || '',
-        picture:   q.prefill_picture   || ''
+        email: q.prefill_email || '',
+        name: q.prefill_name || '',
+        picture: q.prefill_picture || ''
       }
-      // Clean query params from URL
       this.$router.replace({ path: '/signup' })
       this.step = 'details'
-      return
     }
-
-    // Handle OAuth callback if Google redirected here
-    this.handleOAuthCallback()
+    
+    // Check for redirect result
+    await this.checkRedirectResult()
   },
   methods: {
-    handleGoogleSignIn() {
-      this.loading = true
-      this.error   = ''
-
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
-      if (!clientId) {
-        this.error   = 'Google client ID is not configured.'
-        this.loading = false
-        return
-      }
-
-      // Persist role so it survives the redirect round-trip
-      sessionStorage.setItem(ROLE_KEY, this.role)
-
-      const redirectUri = `${window.location.origin}/signup`
-
-      const params = new URLSearchParams({
-        client_id:     clientId,
-        redirect_uri:  redirectUri,
-        response_type: 'code',
-        scope:         'openid email profile',
-        access_type:   'offline',
-        prompt:        'select_account',
-        state:         btoa(JSON.stringify({ flow: 'signup', returnTo: '/signup' }))
-      })
-
-      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
-    },
-
-    async handleOAuthCallback() {
-      const url        = new URL(window.location.href)
-      const code       = url.searchParams.get('code')
-      const state      = url.searchParams.get('state')
-      const errorParam = url.searchParams.get('error')
-
-      if (!code && !errorParam) return // Normal page load
-
-      let stateData = {}
-      try { stateData = JSON.parse(atob(state || '')) } catch { /* ignore */ }
-      if (stateData.flow !== 'signup') return
-
-      // Clean URL
-      window.history.replaceState({}, '', '/signup')
-
-      if (errorParam) {
-        this.error = 'Google sign-in was cancelled. Please try again.'
-        return
-      }
-
-      // Restore role from before the redirect
-      const savedRole = sessionStorage.getItem(ROLE_KEY)
-      if (savedRole) {
-        this.role = savedRole
-        sessionStorage.removeItem(ROLE_KEY)
-      }
-
-      this.loading = true
-      this.error   = ''
-
+    async checkRedirectResult() {
       try {
-        const redirectUri = `${window.location.origin}/signup`
-        const res = await api.post('/auth/google', {
-          code,
-          redirect_uri: redirectUri
-        })
-
-        if (res.data.token) {
-          // User already has an account → redirect to their dashboard
-          this.saveUserSession(res.data.token, res.data.user)
-          this.redirectToDashboard(res.data.user.role)
+        const result = await handleRedirectResult()
+        if (result) {
+          await this.processGoogleSignIn(result)
+        }
+      } catch (error) {
+        console.error('Redirect sign-in error:', error)
+        this.error = 'Sign-up failed. Please try again.'
+      }
+    },
+    
+    async processGoogleSignIn(result) {
+      try {
+        const idToken = await result.user.getIdToken()
+        const res = await api.post('/auth/google', { token: idToken })
+        
+        if (res.token) {
+          this.saveUserSession(res.token, res.user)
+          this.redirectToDashboard(res.user.role)
           return
         }
-
-        if (res.data.needs_profile) {
-          this.googleData = res.data.google_data
-          this.step       = 'details'
+        
+        if (res.needs_profile) {
+          this.googleData = res.google_data
+          this.step = 'details'
         }
-
       } catch (err) {
-        this.error = err.response?.data?.error || 'Google authentication failed.'
+        throw err
+      }
+    },
+    
+    async handleGoogleSignIn() {
+      this.loading = true
+      this.error = ''
+      
+      try {
+        const result = await signInWithGoogle()
+        
+        if (result?.isRedirecting) {
+          this.isRedirecting = true
+          this.loading = false
+          return
+        }
+        
+        await this.processGoogleSignIn(result)
+        
+      } catch (err) {
+        if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+          this.error = 'Sign-up cancelled. Please try again.'
+        } else if (err.code === 'auth/popup-blocked') {
+          this.error = 'Popup was blocked. Redirecting to Google Sign-In page...'
+          try {
+            const { signInWithRedirect } = await import('../firebase')
+            await signInWithRedirect(auth, provider)
+          } catch (redirectErr) {
+            this.error = 'Please allow popups for this site to sign up with Google.'
+          }
+        } else {
+          this.error = err.response?.data?.error || err.message || 'Google sign-up failed. Please try again.'
+        }
       } finally {
         this.loading = false
       }
     },
-
+    
     async completeProfile() {
       this.loading = true
-      this.error   = ''
+      this.error = ''
       try {
         const payload = {
           google_id: this.googleData.google_id,
-          email:     this.googleData.email,
-          name:      this.googleData.name,
-          picture:   this.googleData.picture,
-          role:      this.role,
-          phone:     this.phone || null
+          email: this.googleData.email,
+          name: this.googleData.name,
+          picture: this.googleData.picture,
+          role: this.role,
+          phone: this.phone || null
         }
-
+        
         if (this.role === 'trainer') {
           payload.specialization = this.specialization
-          payload.experience     = parseInt(this.experience) || 0
+          payload.experience = parseInt(this.experience) || 0
           payload.certifications = this.certifications
-          payload.bio            = this.bio
+          payload.bio = this.bio
         }
-
+        
         const res = await api.post('/auth/google/complete', payload)
-
-        this.saveUserSession(res.data.token, res.data.user)
-        this.redirectToDashboard(res.data.user.role)
-
+        this.saveUserSession(res.token, res.user)
+        this.redirectToDashboard(res.user.role)
       } catch (err) {
         this.error = err.response?.data?.error || 'Registration failed. Please try again.'
       } finally {
         this.loading = false
       }
     },
-
+    
     saveUserSession(token, user) {
-      localStorage.setItem('token',    token)
+      localStorage.setItem('token', token)
       localStorage.setItem('userRole', user.role)
       localStorage.setItem('userName', user.name)
-      localStorage.setItem('userId',   user.id)
-      localStorage.setItem('user',     JSON.stringify(user))
+      localStorage.setItem('userId', user.id)
+      localStorage.setItem('user', JSON.stringify(user))
     },
-
+    
     redirectToDashboard(role) {
-      if (role === 'admin')        this.$router.push('/admin')
+      if (role === 'admin') this.$router.push('/admin')
       else if (role === 'trainer') this.$router.push('/trainer')
-      else                         this.$router.push('/client')
+      else this.$router.push('/client')
     },
-
+    
     resetToChoose() {
-      this.step       = 'choose'
+      this.step = 'choose'
       this.googleData = { google_id: '', email: '', name: '', picture: '' }
-      this.error      = ''
+      this.error = ''
     }
   }
 }

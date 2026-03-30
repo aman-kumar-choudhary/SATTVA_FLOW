@@ -7,7 +7,6 @@ from config import Config
 from auth import token_required, admin_required, trainer_required, client_required, generate_jwt, decode_jwt
 from models import User, OTP, Assignment, Session, Plan, Query, Review, Notification, MongoModel
 from utils import verify_google_token, send_notification, validate_phone, validate_email
-import requests as http_requests
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -41,95 +40,37 @@ def _build_user_payload(user):
         'status':  user.get('status', 'pending')
     }
 
-
-def _exchange_code_for_google_data(code, redirect_uri):
-    """
-    Exchange an OAuth authorization code for Google user info.
-    Returns a dict with google_id, email, name, picture — or None on failure.
-    """
-    try:
-        # Step 1: exchange code for tokens
-        token_resp = http_requests.post(
-            'https://oauth2.googleapis.com/token',
-            data={
-                'code':          code,
-                'client_id':     Config.GOOGLE_CLIENT_ID,
-                'client_secret': Config.GOOGLE_CLIENT_SECRET,
-                'redirect_uri':  redirect_uri,
-                'grant_type':    'authorization_code',
-            },
-            timeout=10
-        )
-        token_data = token_resp.json()
-        if 'error' in token_data:
-            print(f"Token exchange error: {token_data}")
-            return None
-
-        access_token = token_data.get('access_token')
-        id_token     = token_data.get('id_token')
-
-        if not access_token:
-            return None
-
-        # Step 2: fetch user info using access token
-        userinfo_resp = http_requests.get(
-            'https://www.googleapis.com/oauth2/v2/userinfo',
-            headers={'Authorization': f'Bearer {access_token}'},
-            timeout=10
-        )
-        info = userinfo_resp.json()
-
-        if not info.get('verified_email', False):
-            print("Google: email not verified")
-            return None
-
-        return {
-            'google_id': info['id'],
-            'email':     info['email'],
-            'name':      info.get('name', ''),
-            'picture':   info.get('picture', ''),
-        }
-
-    except Exception as e:
-        print(f"Google code exchange error: {e}")
-        return None
-
-
-@app.after_request
-def fix_cors_headers(response):
-    response.headers["Cross-Origin-Opener-Policy"]   = "same-origin-allow-popups"
-    response.headers["Cross-Origin-Embedder-Policy"] = "credentialless"
-    response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
-    return response
-
+# @app.after_request
+# def fix_cors_headers(response):
+   
+    
+#     response.headers["Cross-Origin-Embedder-Policy"] = "credentialless"
+#     response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+#     return response
 
 # ==================== AUTHENTICATION ROUTES ====================
 
 @app.route('/api/auth/google', methods=['POST'])
 def google_auth():
     """
-    Accepts either:
-      - { token: '<google_id_token>' }  — legacy / One Tap flow
-      - { code: '<oauth_code>', redirect_uri: '...' }  — redirect flow
+    Accepts: { token: '<firebase_id_token>' }
+
+    The frontend gets this token via Firebase SDK:
+        const result  = await signInWithPopup(auth, provider)
+        const idToken = await result.user.getIdToken()
 
     Returns one of:
-      - { token, user }           → existing user, log them in
-      - { needs_profile, google_data }  → new user, must complete signup first
+      - { token, user }                → existing user, log them in
+      - { needs_profile, google_data } → new user, must complete signup first
       - 4xx on error
     """
     data = request.get_json() or {}
 
-    # ── Resolve google_data from either token or code ────────────────────────
-    google_data = None
+    id_token = data.get('token')
+    if not id_token:
+        return jsonify({'error': 'Firebase ID token is required'}), 400
 
-    if data.get('token'):
-        # ID-token path (One Tap / popup)
-        google_data = verify_google_token(data['token'])
-    elif data.get('code'):
-        # Authorization-code path (redirect flow)
-        redirect_uri = data.get('redirect_uri', '')
-        google_data  = _exchange_code_for_google_data(data['code'], redirect_uri)
-
+    google_data = verify_google_token(id_token)
     if not google_data:
         return jsonify({'error': 'Invalid or expired Google credentials'}), 401
 
@@ -164,7 +105,6 @@ def google_auth():
     user = user_model.find_by_google_id(google_id) or user_model.find_by_email(email)
 
     if user:
-        # Patch google_id if missing
         if not user.get('google_id'):
             user_model.update(user['_id'], {
                 'google_id': google_id,
@@ -277,7 +217,6 @@ def update_profile():
     allowed = ['name', 'phone', 'profile']
     update  = {k: v for k, v in data.items() if k in allowed}
 
-    # Trainer-specific fields
     if request.user.get('role') == 'trainer':
         trainer_fields = ['specialization', 'experience', 'certifications', 'bio']
         trainer_update = {f'trainer_details.{k}': v for k, v in data.items() if k in trainer_fields}

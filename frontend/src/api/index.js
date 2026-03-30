@@ -24,188 +24,181 @@ const api = {
         throw new Error(data.error || 'API request failed')
       }
       
-      return { success: true, ...data }
+      return data  // Return just the data, not { success: true, ...data }
     } catch (error) {
       console.error('API Error:', error)
-      return { success: false, error: error.message }
+      throw error  // Throw the error so it can be caught
     }
   },
   
-  // Auth
-  sendOTP(identifier, method) {
-    return this.request('/auth/send-otp', {
+  // Convenience methods
+  get(endpoint) {
+    return this.request(endpoint, { method: 'GET' })
+  },
+  
+  post(endpoint, data) {
+    return this.request(endpoint, {
       method: 'POST',
-      body: JSON.stringify({ identifier, method })
+      body: JSON.stringify(data)
     })
   },
   
-  verifyOTP(identifier, otp, role, name) {
-    return this.request('/auth/verify-otp', {
-      method: 'POST',
-      body: JSON.stringify({ identifier, otp, role, name })
+  put(endpoint, data) {
+    return this.request(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data)
     })
+  },
+  
+  delete(endpoint) {
+    return this.request(endpoint, { method: 'DELETE' })
+  },
+  
+  // Auth (update these to use the new methods)
+  async sendOTP(identifier, method) {
+    return this.post('/auth/send-otp', { identifier, method })
+  },
+  
+  async verifyOTP(identifier, otp, role, name) {
+    return this.post('/auth/verify-otp', { identifier, otp, role, name })
   },
   
   getCurrentUser() {
-    return this.request('/auth/me')
+    return this.get('/auth/me')
   },
   
   // Admin
   getTrainers(status) {
     const query = status ? `?status=${status}` : ''
-    return this.request(`/admin/trainers${query}`)
+    return this.get(`/admin/trainers${query}`)
   },
   
   approveTrainer(trainerId) {
-    return this.request(`/admin/trainers/${trainerId}/approve`, { method: 'PUT' })
+    return this.put(`/admin/trainers/${trainerId}/approve`)
   },
   
   rejectTrainer(trainerId, reason) {
-    return this.request(`/admin/trainers/${trainerId}/reject`, {
-      method: 'PUT',
-      body: JSON.stringify({ reason })
-    })
+    return this.put(`/admin/trainers/${trainerId}/reject`, { reason })
   },
   
   getClients() {
-    return this.request('/admin/clients')
+    return this.get('/admin/clients')
   },
   
   assignClient(trainerId, clientId) {
-    return this.request('/admin/assignments', {
-      method: 'POST',
-      body: JSON.stringify({ trainer_id: trainerId, client_id: clientId })
-    })
+    return this.post('/admin/assignments', { trainer_id: trainerId, client_id: clientId })
   },
   
   getAssignments() {
-    return this.request('/admin/assignments')
+    return this.get('/admin/assignments')
   },
   
   getQueries(status) {
     const query = status ? `?status=${status}` : ''
-    return this.request(`/admin/queries${query}`)
+    return this.get(`/admin/queries${query}`)
   },
   
   respondToQuery(queryId, response) {
-    return this.request(`/admin/queries/${queryId}/respond`, {
-      method: 'POST',
-      body: JSON.stringify({ response })
-    })
+    return this.post(`/admin/queries/${queryId}/respond`, { response })
   },
   
   getReviews(status) {
     const query = status ? `?status=${status}` : ''
-    return this.request(`/admin/reviews${query}`)
+    return this.get(`/admin/reviews${query}`)
   },
   
   approveReview(reviewId) {
-    return this.request(`/admin/reviews/${reviewId}/approve`, { method: 'PUT' })
+    return this.put(`/admin/reviews/${reviewId}/approve`)
   },
   
   rejectReview(reviewId) {
-    return this.request(`/admin/reviews/${reviewId}/reject`, { method: 'DELETE' })
+    return this.delete(`/admin/reviews/${reviewId}/reject`)
   },
   
   getStats() {
-    return this.request('/admin/stats')
+    return this.get('/admin/stats')
   },
   
   // Trainer
   getTrainerClients() {
-    return this.request('/trainer/clients')
+    return this.get('/trainer/clients')
   },
   
   getTrainerSessions() {
-    return this.request('/trainer/sessions')
+    return this.get('/trainer/sessions')
   },
   
   createSession(sessionData) {
-    return this.request('/trainer/sessions', {
-      method: 'POST',
-      body: JSON.stringify(sessionData)
-    })
+    return this.post('/trainer/sessions', sessionData)
   },
   
   getTrainerPlans(clientId) {
     const query = clientId ? `?client_id=${clientId}` : ''
-    return this.request(`/trainer/plans${query}`)
+    return this.get(`/trainer/plans${query}`)
   },
   
   createPlan(planData) {
-    return this.request('/trainer/plans', {
-      method: 'POST',
-      body: JSON.stringify(planData)
-    })
+    return this.post('/trainer/plans', planData)
   },
   
   updatePlanProgress(planId, progress) {
-    return this.request(`/trainer/plans/${planId}/progress`, {
-      method: 'PUT',
-      body: JSON.stringify({ progress })
-    })
+    return this.put(`/trainer/plans/${planId}/progress`, { progress })
   },
   
   getTrainerReviews() {
-    return this.request('/trainer/reviews')
+    return this.get('/trainer/reviews')
   },
   
   // Client
   getMyTrainer() {
-    return this.request('/client/trainer')
+    return this.get('/client/trainer')
   },
   
   getMySessions() {
-    return this.request('/client/sessions')
+    return this.get('/client/sessions')
   },
   
   getMyPlans() {
-    return this.request('/client/plans')
+    return this.get('/client/plans')
   },
   
   createQuery(subject, message) {
-    return this.request('/client/queries', {
-      method: 'POST',
-      body: JSON.stringify({ subject, message })
-    })
+    return this.post('/client/queries', { subject, message })
   },
   
   getMyQueries() {
-    return this.request('/client/queries')
+    return this.get('/client/queries')
   },
   
   createReview(rating, comment) {
-    return this.request('/client/reviews', {
-      method: 'POST',
-      body: JSON.stringify({ rating, comment })
-    })
+    return this.post('/client/reviews', { rating, comment })
   },
   
   getMyReviews() {
-    return this.request('/client/reviews')
+    return this.get('/client/reviews')
   },
   
   // Notifications
   getNotifications(unreadOnly = false) {
     const query = unreadOnly ? '?unread=true' : ''
-    return this.request(`/notifications${query}`)
+    return this.get(`/notifications${query}`)
   },
   
   markNotificationRead(notificationId) {
-    return this.request(`/notifications/${notificationId}/read`, { method: 'PUT' })
+    return this.put(`/notifications/${notificationId}/read`)
   },
   
   markAllRead() {
-    return this.request('/notifications/read-all', { method: 'PUT' })
+    return this.put('/notifications/read-all')
   },
   
   // Public
   getFeaturedTrainers() {
-    return this.request('/public/trainers')
+    return this.get('/public/trainers')
   },
   
   getPublicReviews() {
-    return this.request('/public/reviews')
+    return this.get('/public/reviews')
   }
 }
 

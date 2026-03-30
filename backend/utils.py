@@ -4,35 +4,56 @@ from email.mime.multipart import MIMEMultipart
 from twilio.rest import Client
 from config import Config
 
-# ── Google token verification ─────────────────────────────────────────────────
+# ── Firebase Admin SDK setup ──────────────────────────────────────────────────
+# Install: pip install firebase-admin
+# Set env var FIREBASE_SERVICE_ACCOUNT_KEY to the path of your service account JSON
+# OR set GOOGLE_APPLICATION_CREDENTIALS (same thing)
 
-def verify_google_token(token):
+import firebase_admin
+from firebase_admin import credentials, auth as firebase_auth
+import os
+
+def _init_firebase():
+    """Initialize Firebase Admin SDK (idempotent)."""
+    if not firebase_admin._apps:
+        key_path = os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY')
+        if key_path and os.path.exists(key_path):
+            cred = credentials.Certificate(key_path)
+        else:
+            # Falls back to GOOGLE_APPLICATION_CREDENTIALS env var automatically
+            cred = credentials.ApplicationDefault()
+        firebase_admin.initialize_app(cred)
+
+_init_firebase()
+
+
+def verify_google_token(id_token):
     """
-    Verify a Google ID token and return the user's info dict, or None on failure.
-    Requires: pip install google-auth
+    Verify a Firebase ID token and return the user's info dict, or None on failure.
+    The frontend gets this token via: await firebaseUser.getIdToken()
     """
     try:
-        from google.oauth2 import id_token
-        from google.auth.transport import requests as google_requests
+        decoded = firebase_auth.verify_id_token(id_token)
 
-        idinfo = id_token.verify_oauth2_token(
-            token,
-            google_requests.Request(),
-            Config.GOOGLE_CLIENT_ID
-        )
-
-        if not idinfo.get('email_verified', False):
-            print("Google token: email not verified")
+        email = decoded.get('email', '')
+        if not decoded.get('email_verified', False):
+            print(f"Firebase token: email not verified for {email}")
             return None
 
         return {
-            'google_id': idinfo['sub'],
-            'email':     idinfo['email'],
-            'name':      idinfo.get('name', ''),
-            'picture':   idinfo.get('picture', ''),
+            'google_id': decoded['uid'],       # Firebase UID == Google sub
+            'email':     email,
+            'name':      decoded.get('name', ''),
+            'picture':   decoded.get('picture', ''),
         }
+    except firebase_auth.ExpiredIdTokenError:
+        print("Firebase token: expired")
+        return None
+    except firebase_auth.InvalidIdTokenError as e:
+        print(f"Firebase token: invalid — {e}")
+        return None
     except Exception as e:
-        print(f"Google token verification error: {e}")
+        print(f"Firebase token verification error: {e}")
         return None
 
 
