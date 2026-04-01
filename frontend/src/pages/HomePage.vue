@@ -32,14 +32,14 @@
       <div class="hero-content">
         
         <h1 class="hero-title">
-          Flow Into<br><em>Your Best</em><br><span class="gold">Self</span>
+          Breathe Into<br><em>Your Inner</em><br><span class="gold">Peace</span>
         </h1>
         <p class="hero-subtitle">
-          A premium yoga management platform. Connect with expert trainers, follow personalised sessions, and track your transformation — all in one sacred space.
+          A sacred space for your yoga journey. Connect with experienced yoga guides, follow personalised practices, and witness your transformation — one mindful breath at a time.
         </p>
         <div class="hero-actions">
           <a href="#cta" class="btn-primary">
-            <span>Begin Your Journey</span>
+            <span>Begin Your Practice</span>
             <span>→</span>
           </a>
           <a href="#how" class="btn-secondary">
@@ -89,15 +89,15 @@
           <div class="hero-float-tag t1">
             <div class="dot green"></div>
             <div>
-              <div style="font-size:11px;font-weight:600;color:#1a2e1a">128 Active Sessions</div>
-              <div style="font-size:10px;color:#7a8c7a">Right now</div>
+              <div style="font-size:11px;font-weight:600;color:#1a2e1a">Daily Yoga Flow</div>
+              <div style="font-size:10px;color:#7a8c7a">Mind • Body • Balance</div>
             </div>
           </div>
           <div class="hero-float-tag t2">
             <div class="dot gold"></div>
             <div>
-              <div style="font-size:11px;font-weight:600;color:#1a2e1a">OTP Login</div>
-              <div style="font-size:10px;color:#7a8c7a">Passwordless security</div>
+              <div style="font-size:11px;font-weight:600;color:#1a2e1a">Guided Sessions</div>
+              <div style="font-size:10px;color:#7a8c7a">Personalised for you</div>
             </div>
           </div>
         </div>
@@ -107,15 +107,15 @@
       <div class="hero-stats">
         <div class="stat-item">
           <div class="stat-num" ref="statClients">0</div>
-          <div class="stat-label">Happy Clients</div>
+          <div class="stat-label">Souls Transformed</div>
         </div>
         <div class="stat-item">
           <div class="stat-num" ref="statTrainers">0</div>
-          <div class="stat-label">Expert Trainers</div>
+          <div class="stat-label">Yoga Guides</div>
         </div>
         <div class="stat-item">
           <div class="stat-num" ref="statSessions">0</div>
-          <div class="stat-label">Sessions Done</div>
+          <div class="stat-label">Sessions Completed</div>
         </div>
       </div>
 
@@ -129,45 +129,122 @@
     <section id="features">
       <div class="section-inner">
         <div class="reveal">
-          <span class="section-label">✦ Platform Features</span>
-          <h2 class="section-title">Everything You Need to<br><em>Thrive &amp; Grow</em></h2>
+          <span class="section-label">✦ Sacred Poses</span>
+          <h2 class="section-title">Postures That<br><em>Awaken &amp; Heal</em></h2>
         </div>
         <div class="features-grid">
           <div class="feature-card reveal stagger-1">
             <div class="feature-num">01</div>
-            <div class="feature-icon">🔐</div>
-            <div class="feature-title">OTP-Based Login</div>
-            <div class="feature-desc">No passwords, no hassle. Secure WhatsApp &amp; email OTP authentication for every user — trainers, clients, and admin alike.</div>
+<div class="feature-icon">
+  <svg viewBox="0 0 24 24" width="30" height="30" 
+       stroke="currentColor" fill="none" stroke-width="1.5"
+       stroke-linecap="round" stroke-linejoin="round">
+
+    <circle cx="12" cy="3.5" r="2"></circle>
+    <path d="M12 5.5 L12 12"></path>
+    <path d="M12 6 L8 2"></path>
+    <path d="M12 6 L16 2"></path>
+    <path d="M12 12 L9 20"></path>
+    <path d="M12 12 L15 20"></path>
+
+  </svg>
+</div>            <div class="feature-title">Surya Namaskar</div>
+            <div class="feature-desc">Greet the sun with this flowing sequence of twelve postures. Awakens the entire body, ignites inner warmth, and sets a peaceful, energised tone for your day.</div>
           </div>
+          <!-- 02 Hatha Yoga -->
           <div class="feature-card reveal stagger-2">
             <div class="feature-num">02</div>
-            <div class="feature-icon">🧘</div>
-            <div class="feature-title">Personalized Sessions</div>
-            <div class="feature-desc">Each client gets custom yoga plans from their assigned trainer. Daily sessions tailored to body type, goals, and progress.</div>
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" width="30" height="30" stroke="currentColor" fill="none" stroke-width="1.5">
+                <circle cx="12" cy="4" r="2"/>
+                <path d="M12 6 L12 14"/>
+                <path d="M12 10 L8 12"/>
+                <path d="M12 10 L16 12"/>
+                <path d="M12 14 L9 20"/>
+                <path d="M12 14 L15 20"/>
+              </svg>
+            </div>
+            <div class="feature-title">Hatha Yoga</div>
+            <div class="feature-desc">
+              A gentle and traditional practice focusing on posture, breathing, and alignment.
+              Perfect for beginners seeking balance, flexibility, and calmness.
+            </div>
           </div>
+
+          <!-- 03 Yin Yoga Flow -->
           <div class="feature-card reveal stagger-3">
             <div class="feature-num">03</div>
-            <div class="feature-icon">📊</div>
-            <div class="feature-title">Progress Analytics</div>
-            <div class="feature-desc">Visual progress charts, attendance tracking, and performance metrics help clients and trainers see real transformation.</div>
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" width="30" height="30" stroke="currentColor" fill="none" stroke-width="1.5">
+                <circle cx="6" cy="6" r="2"/>
+                <path d="M8 6 L14 10"/>
+                <path d="M14 10 L20 10"/>
+                <path d="M14 10 L12 18"/>
+              </svg>
+            </div>
+            <div class="feature-title">Yin Yoga Flow</div>
+            <div class="feature-desc">
+              Slow, deep stretches held for longer durations to release tension,
+              improve flexibility, and calm the nervous system.
+            </div>
           </div>
+
+          <!-- 04 Iyengar Yoga -->
           <div class="feature-card reveal stagger-4">
             <div class="feature-num">04</div>
-            <div class="feature-icon">🛡️</div>
-            <div class="feature-title">Privacy-First Design</div>
-            <div class="feature-desc">Strict role-based access control. Clients only see their trainer. Trainers only see assigned clients. Admin sees everything.</div>
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" width="30" height="30" stroke="currentColor" fill="none" stroke-width="1.5">
+                <circle cx="12" cy="4" r="2"/>
+                <path d="M12 6 L12 14"/>
+                <path d="M12 9 L6 9"/>
+                <path d="M12 9 L18 9"/>
+                <path d="M12 14 L10 20"/>
+                <path d="M12 14 L14 20"/>
+              </svg>
+            </div>
+            <div class="feature-title">Iyengar Yoga</div>
+            <div class="feature-desc">
+              Precision-focused yoga using alignment and controlled movement.
+              Builds strength, posture awareness, and body stability.
+            </div>
           </div>
+
+          <!-- 05 Ashtanga Yoga -->
           <div class="feature-card reveal stagger-5">
             <div class="feature-num">05</div>
-            <div class="feature-icon">💬</div>
-            <div class="feature-title">Query &amp; Review System</div>
-            <div class="feature-desc">Seamless communication channels. Clients rate trainers, send queries to admin, and get WhatsApp/email notifications instantly.</div>
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" width="30" height="30" stroke="currentColor" fill="none" stroke-width="1.5">
+                <circle cx="12" cy="4" r="2"/>
+                <path d="M12 6 L10 12"/>
+                <path d="M10 12 L6 18"/>
+                <path d="M12 6 L14 12"/>
+                <path d="M14 12 L18 18"/>
+              </svg>
+            </div>
+            <div class="feature-title">Ashtanga Yoga</div>
+            <div class="feature-desc">
+              A dynamic and physically demanding yoga style with structured sequences.
+              Builds endurance, discipline, and inner strength.
+            </div>
           </div>
+
+          <!-- 06 Pregnancy Yoga -->
           <div class="feature-card reveal stagger-6">
             <div class="feature-num">06</div>
-            <div class="feature-icon">⚙️</div>
-            <div class="feature-title">Admin Super Control</div>
-            <div class="feature-desc">One admin to rule them all. Approve trainers, assign clients, edit homepage, manage pricing — all from a beautiful dashboard.</div>
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" width="30" height="30" stroke="currentColor" fill="none" stroke-width="1.5">
+                <circle cx="12" cy="5" r="2"/>
+                <path d="M12 7 L12 14"/>
+                <path d="M12 10 C16 10 16 14 12 14"/>
+                <path d="M12 14 L10 20"/>
+                <path d="M12 14 L14 20"/>
+              </svg>
+            </div>
+            <div class="feature-title">Pregnancy Yoga</div>
+            <div class="feature-desc">
+              Gentle and safe yoga practices designed for expecting mothers.
+              Supports relaxation, breathing, and body comfort during pregnancy.
+            </div>
           </div>
         </div>
       </div>
@@ -178,37 +255,37 @@
       <div class="how-bg-text">SATTVĀFLOW</div>
       <div class="section-inner">
         <div class="reveal">
-          <span class="section-label">✦ Simple Process</span>
-          <h2 class="section-title">Your Journey<br><em>in 4 Steps</em></h2>
+          <span class="section-label">✦ Your Sacred Path</span>
+          <h2 class="section-title">Your Transformation<br><em>in 4 Steps</em></h2>
         </div>
         <div class="how-grid">
           <div class="how-steps">
             <div class="how-step active reveal stagger-1">
               <div class="step-num">01</div>
               <div class="step-content">
-                <div class="step-title">Sign Up with WhatsApp OTP</div>
-                <div class="step-desc">Enter your WhatsApp number during signup. Receive an instant OTP. Verify and you're in — no password ever needed.</div>
+                <div class="step-title">Begin With an Open Heart</div>
+                <div class="step-desc">Sign up in moments and step onto your mat with intention. No barriers, no complexity — just a warm welcome into a community built around growth and peace.</div>
               </div>
             </div>
             <div class="how-step reveal stagger-2">
               <div class="step-num">02</div>
               <div class="step-content">
-                <div class="step-title">Admin Assigns Your Trainer</div>
-                <div class="step-desc">After registration, our admin reviews and matches you with the perfect trainer based on your goals and preferences.</div>
+                <div class="step-title">Choose Your Yoga Path</div>
+                <div class="step-desc">Share your intentions, fitness level, and personal goals. Our admin mindfully pairs you with a yoga guide whose practice aligns with your unique journey and body.</div>
               </div>
             </div>
             <div class="how-step reveal stagger-3">
               <div class="step-num">03</div>
               <div class="step-content">
-                <div class="step-title">Start Your Yoga Sessions</div>
-                <div class="step-desc">Access your personalized yoga plans, daily sessions, and track every milestone. Your trainer updates your progress in real-time.</div>
+                <div class="step-title">Flow Through Guided Sessions</div>
+                <div class="step-desc">Follow personalised yoga sessions crafted just for you. Every posture, every breath, every sequence is designed to gently deepen your practice and expand your awareness.</div>
               </div>
             </div>
             <div class="how-step reveal stagger-4">
               <div class="step-num">04</div>
               <div class="step-content">
-                <div class="step-title">Transform &amp; Get Notified</div>
-                <div class="step-desc">Receive WhatsApp &amp; email notifications for sessions, reminders, and announcements. Never miss a flow.</div>
+                <div class="step-title">Witness Your Blossoming</div>
+                <div class="step-desc">Watch your flexibility, strength, and inner calm grow with every session. Receive gentle reminders, celebrate milestones, and embrace the beautiful person you are becoming.</div>
               </div>
             </div>
           </div>
@@ -218,26 +295,26 @@
               <div class="phone-screen">
                 <div style="font-size:10px;letter-spacing:3px;color:rgba(255,255,255,0.3);margin-bottom:16px;text-transform:uppercase;">SattvaFlow</div>
                 <div class="phone-card">
-                  <div class="phone-card-label">Today's Session</div>
+                  <div class="phone-card-label">Today's Practice</div>
                   <div class="phone-card-text">Morning Vinyasa Flow · 7:00 AM</div>
                 </div>
                 <div class="phone-card">
-                  <div class="phone-card-label">Your Trainer</div>
+                  <div class="phone-card-label">Your Yoga Guide</div>
                   <div class="phone-card-text">Priya Sharma · Hatha Specialist</div>
                 </div>
                 <div class="phone-card">
-                  <div class="phone-card-label">Progress</div>
+                  <div class="phone-card-label">Your Journey</div>
                   <div class="phone-card-text">Week 3 · 12 sessions completed ✦</div>
                 </div>
-                <div style="margin-top:20px;font-size:10px;letter-spacing:2px;color:rgba(255,255,255,0.25);text-transform:uppercase;text-align:center;">Enter OTP</div>
-                <div class="phone-otp">
-                  <div class="otp-box">3</div>
-                  <div class="otp-box">7</div>
-                  <div class="otp-box">8</div>
-                  <div class="otp-box">1</div>
-                  <div class="otp-box">2</div>
-                  <div class="otp-box">4</div>
-                </div>
+                <div class="phone-card">
+                <div class="phone-card-label">Daily Yoga Flow</div>
+                <div class="phone-card-text">Mind • Body • Balance</div>
+              </div>
+              <div class="phone-card">
+                <div class="phone-card-label">Mindfulness Score</div>
+                <div class="phone-card-text">Calm Level · 82% ✦</div>
+              </div>
+               
               </div>
             </div>
           </div>
@@ -250,10 +327,10 @@
       <div class="section-inner">
         <div class="trainers-header reveal">
           <div>
-            <span class="section-label">✦ Our Experts</span>
-            <h2 class="section-title">Meet Your<br><em>Guides</em></h2>
+            <span class="section-label">✦ Your Guides</span>
+            <h2 class="section-title">Meet Your<br><em>Healers</em></h2>
           </div>
-          <a href="#cta" class="btn-secondary" style="color:var(--text-dark)">All Trainers <span class="btn-arrow">→</span></a>
+          <a href="#cta" class="btn-secondary" style="color:var(--text-dark)">All Guides <span class="btn-arrow">→</span></a>
         </div>
         <div class="trainers-grid">
           <div class="trainer-card reveal stagger-1">
@@ -266,7 +343,7 @@
               <div class="trainer-spec">Hatha &amp; Vinyasa</div>
               <div class="trainer-stats">
                 <div class="trainer-stat"><div class="trainer-stat-num">4.9</div><div class="trainer-stat-label">Rating</div></div>
-                <div class="trainer-stat"><div class="trainer-stat-num">148</div><div class="trainer-stat-label">Clients</div></div>
+                <div class="trainer-stat"><div class="trainer-stat-num">148</div><div class="trainer-stat-label">Students</div></div>
                 <div class="trainer-stat"><div class="trainer-stat-num">6yr</div><div class="trainer-stat-label">Exp.</div></div>
               </div>
             </div>
@@ -280,7 +357,7 @@
               <div class="trainer-spec">Ashtanga &amp; Power</div>
               <div class="trainer-stats">
                 <div class="trainer-stat"><div class="trainer-stat-num">4.8</div><div class="trainer-stat-label">Rating</div></div>
-                <div class="trainer-stat"><div class="trainer-stat-num">112</div><div class="trainer-stat-label">Clients</div></div>
+                <div class="trainer-stat"><div class="trainer-stat-num">112</div><div class="trainer-stat-label">Students</div></div>
                 <div class="trainer-stat"><div class="trainer-stat-num">8yr</div><div class="trainer-stat-label">Exp.</div></div>
               </div>
             </div>
@@ -295,7 +372,7 @@
               <div class="trainer-spec">Yin &amp; Restorative</div>
               <div class="trainer-stats">
                 <div class="trainer-stat"><div class="trainer-stat-num">4.9</div><div class="trainer-stat-label">Rating</div></div>
-                <div class="trainer-stat"><div class="trainer-stat-num">76</div><div class="trainer-stat-label">Clients</div></div>
+                <div class="trainer-stat"><div class="trainer-stat-num">76</div><div class="trainer-stat-label">Students</div></div>
                 <div class="trainer-stat"><div class="trainer-stat-num">4yr</div><div class="trainer-stat-label">Exp.</div></div>
               </div>
             </div>
@@ -309,7 +386,7 @@
               <div class="trainer-spec">Prenatal &amp; Gentle</div>
               <div class="trainer-stats">
                 <div class="trainer-stat"><div class="trainer-stat-num">5.0</div><div class="trainer-stat-label">Rating</div></div>
-                <div class="trainer-stat"><div class="trainer-stat-num">94</div><div class="trainer-stat-label">Clients</div></div>
+                <div class="trainer-stat"><div class="trainer-stat-num">94</div><div class="trainer-stat-label">Students</div></div>
                 <div class="trainer-stat"><div class="trainer-stat-num">5yr</div><div class="trainer-stat-label">Exp.</div></div>
               </div>
             </div>
@@ -322,51 +399,51 @@
     <section id="pricing">
       <div class="section-inner">
         <div class="reveal" style="text-align:center;max-width:500px;margin:0 auto">
-          <span class="section-label">✦ Transparent Pricing</span>
-          <h2 class="section-title">Simple Plans,<br><em>Profound Results</em></h2>
+          <span class="section-label">✦ Your Investment</span>
+          <h2 class="section-title">Honest Plans,<br><em>Lasting Growth</em></h2>
         </div>
         <div class="pricing-grid">
           <div class="pricing-card reveal stagger-1">
             <span class="pricing-plan">Seeker</span>
             <div class="pricing-price">₹999<span style="font-size:20px;color:var(--text-soft)">/mo</span></div>
-            <div class="pricing-period">Perfect for beginners</div>
+            <div class="pricing-period">For those just beginning</div>
             <ul class="pricing-features">
-              <li>1 Assigned Trainer</li>
-              <li>8 Sessions per Month</li>
-              <li>Progress Tracking</li>
-              <li>WhatsApp Notifications</li>
-              <li>OTP Secure Login</li>
+              <li>1 Dedicated Yoga Guide</li>
+              <li>8 Guided Sessions Monthly</li>
+              <li>Practice Progress Tracking</li>
+              <li>Session Reminders</li>
+              <li>Secure Easy Login</li>
             </ul>
-            <a href="#cta" class="pricing-btn">Get Started</a>
+            <a href="#cta" class="pricing-btn">Start Seeking</a>
           </div>
           <div class="pricing-card featured reveal stagger-2">
-            <div class="pricing-tag">Most Popular</div>
+            <div class="pricing-tag">Most Loved</div>
             <span class="pricing-plan">Practitioner</span>
             <div class="pricing-price" style="color:white">₹1,999<span style="font-size:20px;color:rgba(255,255,255,0.4)">/mo</span></div>
-            <div class="pricing-period">For serious yogis</div>
+            <div class="pricing-period">For the devoted yogi</div>
             <ul class="pricing-features">
-              <li>1 Dedicated Trainer</li>
-              <li>20 Sessions per Month</li>
+              <li>1 Dedicated Yoga Guide</li>
+              <li>20 Guided Sessions Monthly</li>
               <li>Custom Yoga Plans</li>
-              <li>Progress Analytics Charts</li>
-              <li>Session Scheduling</li>
+              <li>Progress &amp; Wellness Charts</li>
+              <li>Flexible Scheduling</li>
               <li>Priority Support</li>
             </ul>
-            <a href="#cta" class="pricing-btn">Begin Journey</a>
+            <a href="#cta" class="pricing-btn">Begin Your Practice</a>
           </div>
           <div class="pricing-card reveal stagger-3">
-            <span class="pricing-plan">Master</span>
+            <span class="pricing-plan">Yogi</span>
             <div class="pricing-price">₹3,499<span style="font-size:20px;color:var(--text-soft)">/mo</span></div>
-            <div class="pricing-period">Unlimited transformation</div>
+            <div class="pricing-period">Unlimited awakening</div>
             <ul class="pricing-features">
-              <li>2 Dedicated Trainers</li>
-              <li>Unlimited Sessions</li>
-              <li>AI Yoga Recommendations</li>
-              <li>Video Session Integration</li>
-              <li>Full Analytics + Reports</li>
-              <li>Exclusive Content Library</li>
+              <li>2 Dedicated Yoga Guides</li>
+              <li>Unlimited Guided Sessions</li>
+              <li>Personalised Pose Guidance</li>
+              <li>Live Video Sessions</li>
+              <li>Full Wellness Reports</li>
+              <li>Sacred Content Library</li>
             </ul>
-            <a href="#cta" class="pricing-btn">Go Master</a>
+            <a href="#cta" class="pricing-btn">Embrace the Path</a>
           </div>
         </div>
       </div>
@@ -377,7 +454,7 @@
       <div class="section-inner">
         <div class="reveal" style="text-align:center;max-width:400px;margin:0 auto">
           <span class="section-label">✦ Testimonials</span>
-          <h2 class="section-title">Voices of<br><em>Transformation</em></h2>
+          <h2 class="section-title">Stories of<br><em>Transformation</em></h2>
         </div>
       </div>
       <div class="reviews-track-wrap">
@@ -408,19 +485,19 @@
       </svg>
       <div class="section-inner">
         <div class="cta-content reveal">
-          <h2 class="cta-title">Ready to <em>Find<br>Your Flow?</em></h2>
-          <p class="cta-sub">Join thousands of yogis transforming their lives with SattvaFlow.<br>No passwords. No complexity. Just pure practice.</p>
+          <h2 class="cta-title">Ready to <em>Come<br>Home to Yourself?</em></h2>
+          <p class="cta-sub">Thousands of souls have already begun their journey with SattvaFlow.<br>No rush. No pressure. Just you, your breath, and the practice waiting for you.</p>
           <div class="cta-actions">
             <a href="/signup" class="btn-gold" @click.prevent="$router.push('/signup')">
-              <span>Start Free Trial</span>
+              <span>Start Your Free Journey</span>
               <span>→</span>
             </a>
-            <a href="#features" class="btn-outline-white">Explore Platform</a>
+            <a href="#features" class="btn-outline-white">Explore the Practice</a>
           </div>
           <div class="cta-trust">
             <div class="cta-trust-item"><span class="cta-check">✓</span> No credit card required</div>
-            <div class="cta-trust-item"><span class="cta-check">✓</span> WhatsApp OTP login</div>
-            <div class="cta-trust-item"><span class="cta-check">✓</span> Cancel anytime</div>
+            <div class="cta-trust-item"><span class="cta-check">✓</span> Guided from day one</div>
+            <div class="cta-trust-item"><span class="cta-check">✓</span> Cancel anytime, no guilt</div>
           </div>
         </div>
       </div>
@@ -443,11 +520,11 @@ export default {
       _statsObserver: null,
       _statsDone: false,
       reviews: [
-        { stars: '★★★★★', text: 'SattvaFlow completely changed my mornings. My trainer Priya understands my body better than I do. Three months in and I\'ve never felt more alive.', initial: 'A', name: 'Ananya Singh', role: 'Client · Delhi' },
-        { stars: '★★★★★', text: 'The OTP login is so smooth. No passwords to remember, just one tap on WhatsApp and I\'m in. The privacy design makes me feel totally safe.', initial: 'R', name: 'Rohit Verma', role: 'Client · Mumbai' },
-        { stars: '★★★★★', text: 'As a trainer, the dashboard is my command center. I can track all my clients\' progress, send session reminders, and communicate directly — all in one place.', initial: 'P', name: 'Priya Sharma', role: 'Trainer · Certified Instructor' },
-        { stars: '★★★★☆', text: 'I was skeptical at first, but the admin matched me with the perfect trainer for prenatal yoga. The session reminders on WhatsApp are a lifesaver.', initial: 'S', name: 'Sunita Kapoor', role: 'Client · Bengaluru' },
-        { stars: '★★★★★', text: 'The progress charts blow my mind every week. Watching my flexibility scores go up is incredibly motivating. SattvaFlow made yoga a habit I love.', initial: 'K', name: 'Karan Patel', role: 'Client · Ahmedabad' },
+        { stars: '★★★★★', text: 'I came to SattvaFlow carrying months of stress and a stiff, tired body. Eight weeks later, I sleep deeply, move freely, and wake up with a sense of peace I had forgotten was possible.', initial: 'A', name: 'Ananya Singh', role: 'Practitioner · Delhi' },
+        { stars: '★★★★★', text: 'My guide Priya has taught me that yoga is not about perfect poses — it is about honest presence. Every session leaves me calmer, more flexible, and genuinely at ease in my own skin.', initial: 'R', name: 'Rohit Verma', role: 'Practitioner · Mumbai' },
+        { stars: '★★★★★', text: 'As a yoga guide on this platform, I feel truly supported. I can focus entirely on my students\' wellbeing — their growth, their breaths, their milestones. This is what teaching should feel like.', initial: 'P', name: 'Priya Sharma', role: 'Yoga Guide · Certified Instructor' },
+        { stars: '★★★★☆', text: 'Prenatal yoga with Kavya has been a gift. She understands my body\'s needs at every stage, and each session brings me closer to a calm, confident birth. I feel held and truly cared for.', initial: 'S', name: 'Sunita Kapoor', role: 'Practitioner · Bengaluru' },
+        { stars: '★★★★★', text: 'I used to think flexibility was something you either had or you didn\'t. SattvaFlow proved me beautifully wrong. Watching my progress week after week has been one of the most joyful surprises of my life.', initial: 'K', name: 'Karan Patel', role: 'Practitioner · Ahmedabad' },
       ]
     }
   },

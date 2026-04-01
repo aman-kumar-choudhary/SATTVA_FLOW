@@ -1,3 +1,4 @@
+# auth.py
 from functools import wraps
 from flask import request, jsonify
 import jwt
@@ -5,56 +6,49 @@ from datetime import datetime, timedelta
 from config import Config
 
 def generate_jwt(user_id, role):
-    """Generate JWT token for authenticated user"""
+    """Generate JWT token"""
     payload = {
-        'user_id': user_id,
+        'user_id': str(user_id),
         'role': role,
         'exp': datetime.utcnow() + Config.JWT_ACCESS_TOKEN_EXPIRES,
         'iat': datetime.utcnow()
     }
-    token = jwt.encode(payload, Config.JWT_SECRET_KEY, algorithm='HS256')
-    return token
+    return jwt.encode(payload, Config.JWT_SECRET_KEY, algorithm='HS256')
 
 def decode_jwt(token):
-    """Decode and verify JWT token"""
+    """Decode and verify JWT"""
     try:
-        payload = jwt.decode(token, Config.JWT_SECRET_KEY, algorithms=['HS256'])
-        return payload
+        return jwt.decode(token, Config.JWT_SECRET_KEY, algorithms=['HS256'])
     except jwt.ExpiredSignatureError:
         return None
     except jwt.InvalidTokenError:
         return None
 
 def token_required(f):
-    """Decorator to protect routes with JWT authentication"""
+    """Decorator to verify JWT token"""
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
+        auth_header = request.headers.get('Authorization', '')
         
-        if not token:
-            return jsonify({'error': 'Token is missing'}), 401
+        if not auth_header:
+            return jsonify({'error': 'Authorization header missing'}), 401
         
-        try:
-            if token.startswith('Bearer '):
-                token = token[7:]
-            
-            payload = decode_jwt(token)
-            if not payload:
-                return jsonify({'error': 'Invalid or expired token'}), 401
-            
-            request.user = payload
-        except Exception as e:
-            return jsonify({'error': 'Invalid token'}), 401
+        token = auth_header[7:] if auth_header.startswith('Bearer ') else auth_header
         
+        payload = decode_jwt(token)
+        if not payload:
+            return jsonify({'error': 'Invalid or expired token'}), 401
+        
+        request.user = payload
         return f(*args, **kwargs)
     return decorated
 
-def role_required(roles):
-    """Decorator to check user role"""
+def role_required(*roles):
+    """Decorator for role-based access control"""
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
-            user_role = request.user.get('role')
+            user_role = getattr(request, 'user', {}).get('role')
             if user_role not in roles:
                 return jsonify({'error': 'Insufficient permissions'}), 403
             return f(*args, **kwargs)
@@ -62,13 +56,13 @@ def role_required(roles):
     return decorator
 
 def admin_required(f):
-    """Decorator for admin-only routes"""
-    return role_required(['admin'])(f)
+    """Admin only decorator"""
+    return role_required('admin')(f)
 
 def trainer_required(f):
-    """Decorator for trainer-only routes"""
-    return role_required(['trainer', 'admin'])(f)
+    """Trainer or admin decorator"""
+    return role_required('trainer', 'admin')(f)
 
 def client_required(f):
-    """Decorator for client-only routes"""
-    return role_required(['client', 'admin'])(f)
+    """Client or admin decorator"""
+    return role_required('client', 'admin')(f)
