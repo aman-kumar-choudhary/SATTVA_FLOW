@@ -43,17 +43,6 @@
               </span>
               <span v-else class="loading-dots">Signing up<span>.</span><span>.</span><span>.</span></span>
             </button>
-
-            <div class="divider">
-              <span class="divider-line"></span>
-              <span class="divider-text">secure · private · instant</span>
-              <span class="divider-line"></span>
-            </div>
-
-            <div class="google-info">
-              <span class="info-icon">🔒</span>
-              We use Google Sign-In — no passwords stored, no data shared.
-            </div>
           </div>
 
           <div v-if="error" class="form-error"><span>⚠</span> {{ error }}</div>
@@ -140,12 +129,6 @@
           Already have an account?
           <router-link to="/login" class="form-link">Sign in →</router-link>
         </div>
-
-        <div class="form-footer-note">
-          <span style="color:var(--gold)">🔒</span>
-          Google OAuth · No passwords · Privacy-first
-        </div>
-
       </div>
     </div>
 
@@ -202,8 +185,8 @@
 </template>
 
 <script>
-import api from '../api'
-import { auth, provider, signInWithGoogle, handleRedirectResult } from '../firebase'
+import { authApi } from '../api'
+import { auth, provider, signInWithGoogle, handleRedirectResult, signInWithRedirect } from '../firebase'
 
 export default {
   name: 'SignupPage',
@@ -250,7 +233,8 @@ export default {
       this.redirectToDashboard(role)
       return
     }
-    
+
+    // Pre-fill Google data when redirected from login page (new user flow)
     const q = this.$route.query
     if (q.prefill_google_id) {
       this.googleData = {
@@ -262,8 +246,8 @@ export default {
       this.$router.replace({ path: '/signup' })
       this.step = 'details'
     }
-    
-    // Check for redirect result
+
+    // Check for redirect return from Google Sign-In
     await this.checkRedirectResult()
   },
   methods: {
@@ -278,61 +262,68 @@ export default {
         this.error = 'Sign-up failed. Please try again.'
       }
     },
-    
+
+    /**
+     * Takes a resolved Firebase popup/redirect result,
+     * exchanges the ID token for a SattvaFlow JWT.
+     * If the account already exists → save session and redirect.
+     * If new user → advance to the profile details step.
+     */
     async processGoogleSignIn(result) {
-      try {
-        const idToken = await result.user.getIdToken()
-        const res = await api.post('/auth/google', { token: idToken })
-        
-        if (res.token) {
-          this.saveUserSession(res.token, res.user)
-          this.redirectToDashboard(res.user.role)
-          return
-        }
-        
-        if (res.needs_profile) {
-          this.googleData = res.google_data
-          this.step = 'details'
-        }
-      } catch (err) {
-        throw err
+      const idToken = await result.user.getIdToken()
+
+      // FIX: was `api.post(...)` — api has no .post() method.
+      // authApi.googleLogin() routes through request() correctly.
+      const res = await authApi.googleLogin(idToken)
+
+      if (res.token) {
+        // Existing user — log them straight in
+        this.saveUserSession(res.token, res.user)
+        this.redirectToDashboard(res.user.role)
+        return
+      }
+
+      if (res.needs_profile) {
+        // New user — collect profile details
+        this.googleData = res.google_data
+        this.step = 'details'
       }
     },
-    
+
     async handleGoogleSignIn() {
       this.loading = true
       this.error = ''
-      
+
       try {
         const result = await signInWithGoogle()
-        
+
+        // signInWithGoogle returns { isRedirecting: true } when popup is blocked
         if (result?.isRedirecting) {
           this.isRedirecting = true
           this.loading = false
           return
         }
-        
+
         await this.processGoogleSignIn(result)
-        
+
       } catch (err) {
         if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
           this.error = 'Sign-up cancelled. Please try again.'
         } else if (err.code === 'auth/popup-blocked') {
           this.error = 'Popup was blocked. Redirecting to Google Sign-In page...'
           try {
-            const { signInWithRedirect } = await import('../firebase')
             await signInWithRedirect(auth, provider)
           } catch (redirectErr) {
             this.error = 'Please allow popups for this site to sign up with Google.'
           }
         } else {
-          this.error = err.response?.data?.error || err.message || 'Google sign-up failed. Please try again.'
+          this.error = err.message || 'Google sign-up failed. Please try again.'
         }
       } finally {
         this.loading = false
       }
     },
-    
+
     async completeProfile() {
       this.loading = true
       this.error = ''
@@ -345,24 +336,26 @@ export default {
           role: this.role,
           phone: this.phone || null
         }
-        
+
         if (this.role === 'trainer') {
           payload.specialization = this.specialization
           payload.experience = parseInt(this.experience) || 0
           payload.certifications = this.certifications
           payload.bio = this.bio
         }
-        
-        const res = await api.post('/auth/google/complete', payload)
+
+        // FIX: was `api.post(...)` — api has no .post() method.
+        // authApi.completeRegistration() routes through request() correctly.
+        const res = await authApi.completeRegistration(payload)
         this.saveUserSession(res.token, res.user)
         this.redirectToDashboard(res.user.role)
       } catch (err) {
-        this.error = err.response?.data?.error || 'Registration failed. Please try again.'
+        this.error = err.message || 'Registration failed. Please try again.'
       } finally {
         this.loading = false
       }
     },
-    
+
     saveUserSession(token, user) {
       localStorage.setItem('token', token)
       localStorage.setItem('userRole', user.role)
@@ -370,13 +363,13 @@ export default {
       localStorage.setItem('userId', user.id)
       localStorage.setItem('user', JSON.stringify(user))
     },
-    
+
     redirectToDashboard(role) {
       if (role === 'admin') this.$router.push('/admin')
       else if (role === 'trainer') this.$router.push('/trainer')
       else this.$router.push('/client')
     },
-    
+
     resetToChoose() {
       this.step = 'choose'
       this.googleData = { google_id: '', email: '', name: '', picture: '' }
@@ -452,12 +445,6 @@ export default {
 .btn-google-inner { display: flex; align-items: center; justify-content: center; gap: 12px; }
 .google-icon { width: 20px; height: 20px; flex-shrink: 0; }
 
-.divider { display: flex; align-items: center; gap: 12px; }
-.divider-line { flex: 1; height: 1px; background: rgba(0,0,0,0.07); }
-.divider-text {
-  font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
-  color: var(--text-soft); white-space: nowrap;
-}
 .google-info {
   display: flex; align-items: center; gap: 8px; padding: 12px 16px;
   background: rgba(124,154,109,0.05); border: 1px solid rgba(124,154,109,0.12);

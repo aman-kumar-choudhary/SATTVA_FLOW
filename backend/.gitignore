@@ -5,6 +5,6 @@ __pycache__/
 tmp/
 temp/
 *.tmp
-*.json
-.env
+# *.json
+# .env
 secrets/

@@ -62,7 +62,7 @@
       <div class="auth-form-inner">
 
         <div class="form-header">
-          <span class="form-label">✦ Secure Login</span>
+          <span class="form-label">✦ Sec</span>
           <h1 class="form-title">Welcome<br><em>Back</em></h1>
           <p class="form-sub">Sign in with your Google account to continue</p>
         </div>
@@ -80,17 +80,6 @@
             </span>
             <span v-else class="loading-dots">Signing in<span>.</span><span>.</span><span>.</span></span>
           </button>
-
-          <div class="divider">
-            <span class="divider-line"></span>
-            <span class="divider-text">secure · private · instant</span>
-            <span class="divider-line"></span>
-          </div>
-
-          <div class="google-info">
-            <span class="info-icon">🔒</span>
-            We use Google Sign-In — no passwords stored, no data shared.
-          </div>
         </div>
 
         <div v-if="error" class="form-error">
@@ -102,11 +91,6 @@
           <router-link to="/signup" class="form-link">Begin your journey →</router-link>
         </div>
 
-        <div class="form-footer-note">
-          <span style="color:var(--gold)">🔒</span>
-          Google OAuth · No passwords · Privacy-first
-        </div>
-
       </div>
     </div>
 
@@ -114,8 +98,8 @@
 </template>
 
 <script>
-import api from '../api'
-import { auth, provider, signInWithGoogle, handleRedirectResult, signInWithPopup } from '../firebase'
+import { authApi } from '../api'
+import { auth, provider, signInWithGoogle, handleRedirectResult, signInWithRedirect } from '../firebase'
 
 export default {
   name: 'LoginPage',
@@ -133,8 +117,8 @@ export default {
       this.redirectToDashboard(role)
       return
     }
-    
-    // Check if this is a redirect from Google Sign-In
+
+    // Check if this is a redirect return from Google Sign-In
     await this.checkRedirectResult()
   },
   methods: {
@@ -142,7 +126,6 @@ export default {
       try {
         const result = await handleRedirectResult()
         if (result) {
-          // We have a redirect result, process it
           await this.processGoogleSignIn(result)
         }
       } catch (error) {
@@ -150,72 +133,74 @@ export default {
         this.error = 'Sign-in failed. Please try again.'
       }
     },
-    
+
+    /**
+     * Takes a resolved Firebase popup/redirect result,
+     * exchanges the ID token for a SattvaFlow JWT, then
+     * either saves the session or redirects to signup.
+     */
     async processGoogleSignIn(result) {
-      try {
-        const idToken = await result.user.getIdToken()
-        const res = await api.post('/auth/google', { token: idToken })
-        
-        if (res.needs_profile) {
-          this.error = 'No account found. Please sign up first.'
-          setTimeout(() => {
-            this.$router.push({
-              path: '/signup',
-              query: {
-                prefill_google_id: res.google_data.google_id,
-                prefill_email:     res.google_data.email,
-                prefill_name:      res.google_data.name,
-                prefill_picture:   res.google_data.picture
-              }
-            })
-          }, 1500)
-          return
-        }
-        
-        this.saveUserSession(res.token, res.user)
-        this.redirectToDashboard(res.user.role)
-      } catch (err) {
-        throw err
+      const idToken = await result.user.getIdToken()
+
+      // FIX: was `api.post(...)` — api has no .post() method.
+      // authApi.googleLogin() routes through request() correctly.
+      const res = await authApi.googleLogin(idToken)
+
+      if (res.needs_profile) {
+        // Account doesn't exist yet — send to signup with Google data prefilled
+        this.error = 'No account found. Please sign up first.'
+        setTimeout(() => {
+          this.$router.push({
+            path: '/signup',
+            query: {
+              prefill_google_id: res.google_data.google_id,
+              prefill_email:     res.google_data.email,
+              prefill_name:      res.google_data.name,
+              prefill_picture:   res.google_data.picture
+            }
+          })
+        }, 1500)
+        return
       }
+
+      this.saveUserSession(res.token, res.user)
+      this.redirectToDashboard(res.user.role)
     },
-    
+
     async handleGoogleSignIn() {
       this.loading = true
       this.error = ''
-      
+
       try {
         const result = await signInWithGoogle()
-        
-        // If redirecting, don't process further
+
+        // signInWithGoogle returns { isRedirecting: true } when popup is blocked
         if (result?.isRedirecting) {
           this.isRedirecting = true
           this.loading = false
           return
         }
-        
-        // Normal popup flow
+
         await this.processGoogleSignIn(result)
-        
+
       } catch (err) {
         if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
           this.error = 'Sign-in cancelled. Please try again.'
         } else if (err.code === 'auth/popup-blocked') {
           this.error = 'Popup was blocked. Redirecting to Google Sign-In page...'
-          // Try redirect method as last resort
           try {
-            const { signInWithRedirect } = await import('../firebase')
             await signInWithRedirect(auth, provider)
           } catch (redirectErr) {
             this.error = 'Please allow popups for this site to sign in with Google.'
           }
         } else {
-          this.error = err.response?.data?.error || err.message || 'Sign-in failed. Please try again.'
+          this.error = err.message || 'Sign-in failed. Please try again.'
         }
       } finally {
         this.loading = false
       }
     },
-    
+
     saveUserSession(token, user) {
       localStorage.setItem('token', token)
       localStorage.setItem('userRole', user.role)
@@ -223,7 +208,7 @@ export default {
       localStorage.setItem('userId', user.id)
       localStorage.setItem('user', JSON.stringify(user))
     },
-    
+
     redirectToDashboard(role) {
       if (role === 'admin') this.$router.push('/admin')
       else if (role === 'trainer') this.$router.push('/trainer')

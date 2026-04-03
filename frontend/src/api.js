@@ -320,10 +320,36 @@ export const notificationApi = {
 // ══════════════════════════════════════════════════════════════════
 
 export const authApi = {
+  /**
+   * Exchange a Firebase Google ID token for a SattvaFlow JWT.
+   * Backend: POST /api/auth/google
+   * Returns: { token, user } on success
+   *          { needs_profile: true, google_data } if new user
+   * Throws on network / server error.
+   */
+  async googleLogin(idToken) {
+    const r = await request('POST', '/api/auth/google', { token: idToken })
+    if (!r.success) throw new Error(r.error || 'Google login failed')
+    return r.data  // { token, user } | { needs_profile, google_data }
+  },
+
+  /**
+   * Complete registration for a new Google user.
+   * Backend: POST /api/auth/google/complete
+   * Returns: { token, user }
+   * Throws on network / server error.
+   */
+  async completeRegistration(payload) {
+    const r = await request('POST', '/api/auth/google/complete', payload)
+    if (!r.success) throw new Error(r.error || 'Registration failed')
+    return r.data  // { token, user }
+  },
+
   async getMe() {
     const r = await request('GET', '/api/auth/me')
     return r.success ? r.data : null
   },
+
   async updateProfile(data) {
     const r = await request('PUT', '/api/auth/profile', data)
     return { success: r.success, user: r.data?.user, error: r.error }
