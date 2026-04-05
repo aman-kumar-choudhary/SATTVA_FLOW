@@ -1,310 +1,386 @@
 <template>
-  <div class="trainer-dashboard">
-    <div class="dashboard-header">
-      <h1>Trainer Dashboard</h1>
-      <p>Welcome back, {{ userName }}</p>
-    </div>
+  <div class="dashboard-root">
 
-    <!-- Stats Cards -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon">👥</div>
-        <div class="stat-info">
-          <div class="stat-value">{{ clients.length }}</div>
-          <div class="stat-label">Assigned Clients</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">📅</div>
-        <div class="stat-info">
-          <div class="stat-value">{{ sessions.length }}</div>
-          <div class="stat-label">Total Sessions</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">📊</div>
-        <div class="stat-info">
-          <div class="stat-value">{{ reviews.length }}</div>
-          <div class="stat-label">Reviews</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">⭐</div>
-        <div class="stat-info">
-          <div class="stat-value">{{ avgRating }}</div>
-          <div class="stat-label">Avg Rating</div>
-        </div>
-      </div>
-    </div>
+    <!-- Mobile overlay -->
+    <div v-if="mobileSidebarOpen" class="sidebar-overlay" @click="mobileSidebarOpen = false"></div>
 
-    <!-- Tabs -->
-    <div class="tabs">
-      <button
-        v-for="tab in tabs"
-        :key="tab.id"
-        :class="{ active: activeTab === tab.id }"
-        @click="activeTab = tab.id"
-      >{{ tab.name }}</button>
-    </div>
+    <!-- ═══ SIDEBAR ═══ -->
+    <aside :class="['sidebar', sidebarCollapsed ? 'sidebar--collapsed' : '', mobileSidebarOpen ? 'sidebar--mobile-open' : '']">
+      <div class="sidebar-brand">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 100" fill="none">
+            <defs>
+              <linearGradient id="appCG" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#7c9a6e"/><stop offset="100%" style="stop-color:#4a6640"/>
+              </linearGradient>
+            </defs>
+            <circle cx="50" cy="50" r="44" fill="url(#appCG)"/>
+            <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+            <path d="M50 68 Q42 73 38 80 Q44 75 50 73 Q56 75 62 80 Q58 73 50 68Z" fill="#e5b029" opacity="0.9"/>
+            <path d="M50 68 Q35 72 30 78 Q38 73 50 71Z" fill="#e5b029" opacity="0.5"/>
+            <path d="M50 68 Q65 72 70 78 Q62 73 50 71Z" fill="#e5b029" opacity="0.5"/>
+            <circle cx="50" cy="28" r="7" fill="rgba(255,255,255,0.92)"/>
+            <line x1="50" y1="35" x2="50" y2="56" stroke="rgba(255,255,255,0.92)" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M50 42 Q40 40 36 44" stroke="rgba(255,255,255,0.85)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+            <path d="M50 42 Q60 40 64 44" stroke="rgba(255,255,255,0.85)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+            <path d="M50 56 Q42 60 38 66" stroke="rgba(255,255,255,0.85)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+            <path d="M50 56 Q58 60 62 66" stroke="rgba(255,255,255,0.85)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+            <text x="108" y="42" font-family="Georgia, serif" font-size="26" font-weight="500" fill="#2C3E2D" letter-spacing="0.5">SattvaFlow</text>
+            <text x="110" y="62" font-family="Georgia, serif" font-size="14" font-weight="300" fill="#c9a84c" letter-spacing="5">YOGA</text>
+            <line x1="108" y1="69" x2="290" y2="69" stroke="#d4c9a8" stroke-width="0.75"/>
+            <text x="110" y="81" font-family="Arial, sans-serif" font-size="9" fill="#9aab8a" letter-spacing="3">FIND YOUR FLOW</text>
+          </svg>
+      </div>
+      <nav class="sidebar-nav">
+        <button
+          v-for="item in navItems" :key="item.id"
+          @click="navigate(item.id)" :title="item.label"
+          :class="['nav-item', activeSection === item.id ? 'nav-item--active' : '']"
+        >
+          <span class="nav-icon">{{ item.icon }}</span>
+          <span v-if="!sidebarCollapsed" class="nav-label">{{ item.label }}</span>
+        </button>
+      </nav>
+      <button class="sidebar-toggle" @click="sidebarCollapsed = !sidebarCollapsed">
+        {{ sidebarCollapsed ? '›' : '‹' }}
+      </button>
+    </aside>
 
-    <!-- ══ MY CLIENTS TAB ══ -->
-    <div v-if="activeTab === 'clients'" class="tab-content">
-      <div class="section-header"><h2>My Clients</h2></div>
-      <div class="empty-state" v-if="clients.length === 0">No clients assigned yet.</div>
-      <div class="clients-grid" v-else>
-        <div class="client-card" v-for="client in clients" :key="client._id">
-          <div class="client-avatar">{{ client.name ? client.name.charAt(0) : '?' }}</div>
-          <div class="client-info">
-            <h4>{{ client.name }}</h4>
-            <p>{{ client.email || client.phone || '—' }}</p>
-            <div class="client-stats">
-              <span>Sessions completed: {{ client.sessions_completed || 0 }}</span>
+    <!-- ═══ MAIN CONTENT ═══ -->
+    <main :class="['main-content', sidebarCollapsed ? 'main-content--collapsed' : '']">
+
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="topbar-inner">
+          <div class="topbar-left">
+            <button class="hamburger-btn" @click="mobileSidebarOpen = !mobileSidebarOpen" aria-label="Toggle menu">
+              <span class="hamburger-line"></span>
+              <span class="hamburger-line"></span>
+              <span class="hamburger-line"></span>
+            </button>
+            <h1 class="page-title">{{ pageTitles[activeSection] || 'Dashboard' }}</h1>
+          </div>
+          <div class="topbar-right">
+            <div class="notif-btn" @click="showNotifications = !showNotifications">
+              <span>🔔</span>
+              <span v-if="unreadCount > 0" class="notif-dot">{{ unreadCount }}</span>
             </div>
-          </div>
-          <div class="client-actions">
-            <button @click="openPlanModal(client)" class="btn-primary small">+ Yoga Plan</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══ SESSIONS TAB (view-only — admin creates sessions) ══ -->
-    <div v-if="activeTab === 'sessions'" class="tab-content">
-      <div class="section-header">
-        <h2>My Sessions</h2>
-        <div class="info-notice">ℹ️ Sessions are created by admin. You can mark attendance below.</div>
-      </div>
-      <div class="empty-state" v-if="sessions.length === 0">No sessions scheduled yet.</div>
-      <div class="sessions-list" v-else>
-        <div class="session-card" v-for="session in sessions" :key="session._id">
-          <div class="session-header">
-            <div class="session-title">{{ session.title }}</div>
-            <div class="session-status" :class="session.status">{{ session.status }}</div>
-          </div>
-          <div class="session-client">👤 Client: {{ getClientName(session.client_id) }}</div>
-          <div class="session-date" v-if="session.scheduled_at">📅 {{ formatDate(session.scheduled_at) }}</div>
-          <div class="session-duration">⏱️ {{ session.duration || 60 }} minutes</div>
-          <div class="session-notes" v-if="session.notes">📝 {{ session.notes }}</div>
-          <div class="session-actions" v-if="session.status === 'scheduled'">
-            <button @click="markAttendance(session._id)" class="btn-approve small">✓ Mark Attended</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══ YOGA PLANS TAB (trainer creates plans for clients) ══ -->
-    <div v-if="activeTab === 'plans'" class="tab-content">
-      <div class="section-header">
-        <h2>Yoga Plans</h2>
-        <button @click="openPlanModal(null)" class="btn-primary">+ New Plan</button>
-      </div>
-      <div class="empty-state" v-if="plans.length === 0">No yoga plans yet. Create one for your clients.</div>
-      <div class="plans-list" v-else>
-        <div class="plan-card" v-for="plan in plans" :key="plan._id">
-          <div class="plan-header">
-            <div class="plan-title">{{ plan.title }}</div>
-            <div class="plan-progress">{{ plan.progress || 0 }}% Complete</div>
-          </div>
-          <div class="plan-client">👤 Client: {{ getClientName(plan.client_id) }}</div>
-          <div class="plan-details">
-            <span>📅 {{ plan.weeks }} weeks</span>
-            <span>🏋️ {{ plan.sessions_per_week }} sessions/week</span>
-          </div>
-          <div class="plan-focus" v-if="plan.focus_areas?.length">
-            🎯 Focus: {{ plan.focus_areas.join(', ') }}
-          </div>
-          <div class="plan-description" v-if="plan.description">{{ plan.description }}</div>
-          <div class="progress-bar">
-            <div class="progress-fill" :style="{ width: (plan.progress || 0) + '%' }"></div>
-          </div>
-          <div class="plan-actions">
-            <button @click="updateProgress(plan._id, plan.progress)" class="btn-link">Update Progress</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══ REVIEWS TAB ══ -->
-    <div v-if="activeTab === 'reviews'" class="tab-content">
-      <div class="section-header"><h2>Client Reviews</h2></div>
-      <div class="empty-state" v-if="reviews.length === 0">No reviews yet.</div>
-      <div class="reviews-list" v-else>
-        <div class="review-card" v-for="review in reviews" :key="review._id">
-          <div class="review-rating">{{ '★'.repeat(review.rating) }}{{ '☆'.repeat(5 - review.rating) }}</div>
-          <div class="review-client">{{ review.client?.name || '—' }}</div>
-          <div class="review-comment">{{ review.comment }}</div>
-          <div class="review-date">{{ formatDate(review.created_at) }}</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══ QUERIES TAB ══ -->
-    <div v-if="activeTab === 'queries'" class="tab-content">
-      <div class="section-header">
-        <h2>My Queries to Admin</h2>
-        <button @click="showQueryModal = true" class="btn-primary">+ New Query</button>
-      </div>
-      <div class="empty-state" v-if="queries.length === 0">No queries submitted yet.</div>
-      <div class="queries-list" v-else>
-        <div class="query-card" v-for="query in queries" :key="query._id">
-          <div class="query-header">
-            <div class="query-subject">{{ query.subject }}</div>
-            <div class="query-status" :class="query.status">{{ query.status }}</div>
-          </div>
-          <div class="query-message">{{ query.message }}</div>
-          <div v-if="query.response" class="query-response"><strong>Admin Response:</strong> {{ query.response }}</div>
-          <div class="query-date">{{ formatDate(query.created_at) }}</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══ PROFILE TAB ══ -->
-    <div v-if="activeTab === 'profile'" class="tab-content">
-      <div class="section-header"><h2>My Profile</h2></div>
-      <div class="profile-card">
-        <div class="profile-avatar-row">
-          <img v-if="profile && profile.picture" :src="profile.picture" class="profile-avatar-img" alt="avatar" />
-          <div v-else class="profile-avatar-fallback">{{ profile?.name ? profile.name.charAt(0) : 'T' }}</div>
-          <div class="profile-meta">
-            <div class="profile-name">{{ profile?.name }}</div>
-            <div class="profile-email">{{ profile?.email }}</div>
-            <div class="profile-status-badge" :class="profile?.status">
-              {{ profile?.status === 'active' ? '✓ Active' : '⏳ Pending Approval' }}
+            <div class="user-chip">
+              <div class="user-avatar">{{ userName.charAt(0).toUpperCase() }}</div>
+              <span class="user-name">{{ userName }}</span>
             </div>
           </div>
         </div>
-
-        <div class="profile-form">
-          <div class="profile-section-label">Personal Details</div>
-          <div class="pf-grid">
-            <div class="pf-group">
-              <label>Full Name</label>
-              <input type="text" v-model="profileForm.name" placeholder="Your full name" />
+        <div v-if="showNotifications" class="notif-dropdown">
+          <div class="notif-header">
+            <span class="notif-title">Notifications</span>
+            <button class="btn-link" @click="markAllRead">Mark all read</button>
+          </div>
+          <div class="notif-list">
+            <div v-for="n in notifications" :key="n._id"
+              :class="['notif-item', !n.read ? 'notif-item--unread' : '']"
+              @click="markNotifRead(n._id)">
+              <div class="notif-item-title">{{ n.title }}</div>
+              <div class="notif-item-msg">{{ n.message }}</div>
+              <div class="notif-item-time">{{ formatDate(n.created_at) }}</div>
             </div>
-            <div class="pf-group">
-              <label>Phone / WhatsApp</label>
-              <input type="tel" v-model="profileForm.phone" placeholder="+91 98765 43210" />
+            <div v-if="!notifications.length" class="empty-state" style="padding:24px">No notifications</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ══════ OVERVIEW ══════ -->
+      <section v-if="activeSection === 'overview'" class="page-section">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon-wrap" style="background:#f0f9f4"><span>👥</span></div>
+            <div class="stat-body"><div class="stat-number">{{ clients.length }}</div><div class="stat-label">My Clients</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon-wrap" style="background:#eff6ff"><span>📅</span></div>
+            <div class="stat-body"><div class="stat-number">{{ sessions.length }}</div><div class="stat-label">Total Sessions</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon-wrap" style="background:#fdf4ff"><span>⭐</span></div>
+            <div class="stat-body"><div class="stat-number">{{ avgRating }}</div><div class="stat-label">Avg Rating</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Quick Actions</h3>
+          <div class="quick-actions-grid">
+            <button v-for="qa in quickActions" :key="qa.id" @click="navigate(qa.id)" class="quick-action-btn">
+              <span class="qa-icon">{{ qa.icon }}</span>
+              <span class="qa-label">{{ qa.label }}</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════ MY CLIENTS ══════ -->
+      <section v-if="activeSection === 'clients'" class="page-section">
+        <div class="empty-state" v-if="clients.length === 0">No clients assigned yet.</div>
+        <div v-else>
+          <!-- Selected client detail panel -->
+          <div v-if="selectedClient" class="client-detail-panel mb-4">
+            <div class="cdp-header">
+              <div class="cdp-avatar">{{ selectedClient.name?.charAt(0) || '?' }}</div>
+              <div class="cdp-header-info">
+                <h3 class="cdp-name">{{ selectedClient.name }}</h3>
+                <div class="cdp-meta">
+                  <span v-if="selectedClient.email">✉ {{ selectedClient.email }}</span>
+                  <span v-if="selectedClient.phone">📞 {{ selectedClient.phone }}</span>
+                  <span v-if="selectedClient.city">📍 {{ selectedClient.city }}</span>
+                  <span>Sessions completed: <strong>{{ selectedClient.sessions_completed || 0 }}</strong></span>
+                </div>
+              </div>
+              <button class="cdp-close" @click="selectedClient = null">×</button>
+            </div>
+
+            <div class="cdp-tabs">
+              <button v-for="tab in clientTabs" :key="tab.id"
+                :class="['cdp-tab', clientDetailTab === tab.id ? 'cdp-tab--active' : '']"
+                @click="clientDetailTab = tab.id">{{ tab.label }}</button>
+            </div>
+
+            <!-- Tab: Overview -->
+            <div v-if="clientDetailTab === 'overview'" class="cdp-body">
+              <div class="cdp-grid">
+                <div class="cdp-field" v-if="selectedClient.age">
+                  <span class="cdp-field-label">Age</span>
+                  <span class="cdp-field-value">{{ selectedClient.age }}</span>
+                </div>
+                <div class="cdp-field" v-if="selectedClient.gender">
+                  <span class="cdp-field-label">Gender</span>
+                  <span class="cdp-field-value">{{ selectedClient.gender }}</span>
+                </div>
+                <div class="cdp-field" v-if="selectedClient.yoga_experience">
+                  <span class="cdp-field-label">Experience</span>
+                  <span class="cdp-field-value cdp-badge-exp">{{ selectedClient.yoga_experience }}</span>
+                </div>
+                <div class="cdp-field" v-if="selectedClient.emergency_contact">
+                  <span class="cdp-field-label">Emergency Contact</span>
+                  <span class="cdp-field-value">{{ selectedClient.emergency_contact }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab: Goals & Expectations -->
+            <div v-if="clientDetailTab === 'goals'" class="cdp-body">
+              <div class="cdp-block" v-if="selectedClient.health_goals">
+                <div class="cdp-block-label">🎯 Health Goals</div>
+                <p class="cdp-block-text">{{ selectedClient.health_goals }}</p>
+              </div>
+              <div class="cdp-block" v-if="selectedClient.expectations">
+                <div class="cdp-block-label">💬 Expectations from Class</div>
+                <p class="cdp-block-text">{{ selectedClient.expectations }}</p>
+              </div>
+              <div class="empty-state" style="padding:24px" v-if="!selectedClient.health_goals && !selectedClient.expectations">
+                Client hasn't filled in goals yet.
+              </div>
+            </div>
+
+            <!-- Tab: Health -->
+            <div v-if="clientDetailTab === 'health'" class="cdp-body">
+              <div class="cdp-block" v-if="selectedClient.health_conditions">
+                <div class="cdp-block-label">⚕️ Health Conditions / Injuries</div>
+                <p class="cdp-block-text cdp-block-text--warn">{{ selectedClient.health_conditions }}</p>
+              </div>
+              <div class="empty-state" style="padding:24px" v-else>
+                No health conditions reported. Great!
+              </div>
+            </div>
+
+            <!-- Tab: Sessions -->
+            <div v-if="clientDetailTab === 'sessions'" class="cdp-body">
+              <div v-if="getClientSessions(selectedClient._id).length === 0" class="empty-state" style="padding:24px">No sessions yet.</div>
+              <div v-else class="table-wrap">
+                <table class="data-table">
+                  <thead><tr><th>Title</th><th>Date</th><th>Status</th><th>Attended</th></tr></thead>
+                  <tbody>
+                    <tr v-for="s in getClientSessions(selectedClient._id)" :key="s._id">
+                      <td class="font-medium">{{ s.title }}</td>
+                      <td>{{ formatDate(s.scheduled_at) }}</td>
+                      <td><span :class="statusPill(s.status)">{{ s.status }}</span></td>
+                      <td><span v-if="s.attendance_marked" style="color:#16a34a">✓</span><span v-else class="text-muted">—</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
-          <div class="profile-section-label">Trainer Details</div>
-          <div class="pf-grid">
-            <div class="pf-group">
-              <label>Specialization</label>
-              <input type="text" v-model="profileForm.specialization" placeholder="e.g. Hatha Yoga, Vinyasa" />
+          <!-- Client cards grid -->
+          <div class="clients-grid">
+            <div :class="['client-card', selectedClient?._id === client._id ? 'client-card--selected' : '']"
+              v-for="client in clients" :key="client._id"
+              @click="openClientDetail(client)">
+              <div class="client-avatar">{{ client.name?.charAt(0) || '?' }}</div>
+              <div class="client-info">
+                <h4 class="font-medium">{{ client.name }}</h4>
+                <p class="text-sm text-muted">{{ client.email || client.phone || '—' }}</p>
+                <div class="client-tags mt-1">
+                  <span v-if="client.yoga_experience" class="cdp-badge-exp" style="font-size:10px;padding:2px 7px">{{ client.yoga_experience }}</span>
+                  <span v-if="client.city" class="tag" style="font-size:10px">📍 {{ client.city }}</span>
+                </div>
+                <div class="text-xs text-muted mt-1">Sessions: {{ client.sessions_completed || 0 }} done</div>
+                <div v-if="client.health_conditions" class="health-warn mt-1">
+                  ⚠ {{ client.health_conditions.substring(0, 50) }}{{ client.health_conditions.length > 50 ? '…' : '' }}
+                </div>
+              </div>
+              <button class="view-detail-btn">{{ selectedClient?._id === client._id ? '▲ Less' : '▼ View' }}</button>
             </div>
-            <div class="pf-group">
-              <label>Years of Experience</label>
-              <input type="number" v-model="profileForm.experience" min="0" />
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════ SESSIONS ══════ -->
+      <section v-if="activeSection === 'sessions'" class="page-section">
+        <div class="info-banner mb-4">
+          <span>ℹ</span><span>Sessions are created by admin. You can mark attendance below.</span>
+        </div>
+        <div class="empty-state" v-if="sessions.length === 0">No sessions scheduled yet.</div>
+        <div v-else class="card">
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Title</th><th>Client</th><th>Date</th><th>Duration</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody>
+                <tr v-for="s in sessions" :key="s._id">
+                  <td class="font-medium">{{ s.title }}</td>
+                  <td>{{ getClientName(s.client_id) }}</td>
+                  <td>{{ formatDate(s.scheduled_at) }}</td>
+                  <td>{{ s.duration || 60 }}m</td>
+                  <td><span :class="statusPill(s.status)">{{ s.status }}</span></td>
+                  <td>
+                    <button v-if="s.status === 'scheduled'" @click="markAttendance(s._id)" class="micro-approve">✓ Attended</button>
+                    <span v-else class="text-muted text-xs">—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════ REVIEWS ══════ -->
+      <section v-if="activeSection === 'reviews'" class="page-section">
+        <div class="empty-state" v-if="reviews.length === 0">No reviews yet.</div>
+        <div v-else class="card">
+          <div v-for="r in reviews" :key="r._id" class="query-row">
+            <div class="review-stars mb-1">{{ '★'.repeat(r.rating) }}{{ '☆'.repeat(5 - r.rating) }}</div>
+            <div class="font-medium mb-1">{{ r.client?.name || '—' }}</div>
+            <p class="text-sm text-muted mb-1" style="font-style:italic">{{ r.comment }}</p>
+            <div class="text-xs text-muted">{{ formatDate(r.created_at) }}</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════ QUERIES ══════ -->
+      <section v-if="activeSection === 'queries'" class="page-section">
+        <div class="list-toolbar">
+          <h2 class="section-heading">Queries to Admin</h2>
+          <button @click="showQueryModal = true" class="btn-primary">+ New Query</button>
+        </div>
+        <div class="empty-state" v-if="queries.length === 0">No queries submitted yet.</div>
+        <div v-else class="card">
+          <div v-for="q in queries" :key="q._id" class="query-row">
+            <div class="flex-between mb-2">
+              <strong class="font-medium">{{ q.subject }}</strong>
+              <span :class="statusPill(q.status)">{{ q.status }}</span>
             </div>
-            <div class="pf-group pf-full">
-              <label>Certifications (comma separated)</label>
-              <input type="text" v-model="profileForm.certifications" placeholder="e.g. RYT-200, YAI" />
+            <p class="text-sm text-muted mb-2">{{ q.message }}</p>
+            <div v-if="q.response" class="query-response">
+              <span class="query-response-label">Admin Response: </span>{{ q.response }}
             </div>
-            <div class="pf-group pf-full">
-              <label>Bio</label>
-              <textarea v-model="profileForm.bio" rows="4" placeholder="Tell clients about yourself…"></textarea>
+            <div class="text-xs text-muted mt-2">{{ formatDate(q.created_at) }}</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════ PROFILE ══════ -->
+      <section v-if="activeSection === 'profile'" class="page-section">
+        <div class="card" style="max-width:620px">
+          <div class="detail-header mb-4">
+            <div class="detail-avatar" style="background:#7c6a4a">{{ profile?.name?.charAt(0) || 'T' }}</div>
+            <div class="detail-info">
+              <h2 class="detail-name">{{ profile?.name }}</h2>
+              <div class="detail-tags">
+                <span class="tag">{{ profile?.email }}</span>
+                <span :class="['status-pill', profile?.status === 'active' ? 'status-active' : 'status-pending']">
+                  {{ profile?.status === 'active' ? '✓ Active' : '⏳ Pending Approval' }}
+                </span>
+              </div>
             </div>
           </div>
 
-          <div v-if="profileSuccess" class="profile-success">✓ {{ profileSuccess }}</div>
-          <div class="pf-actions">
+          <div class="form-section-label">Personal Details</div>
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label class="form-label">Full Name</label>
+              <input type="text" v-model="profileForm.name" class="form-input" placeholder="Your full name" />
+            </div>
+            <div class="form-group flex-1">
+              <label class="form-label">Phone / WhatsApp</label>
+              <input type="tel" v-model="profileForm.phone" class="form-input" placeholder="+91 98765 43210" />
+            </div>
+          </div>
+
+          <div class="form-section-label">Trainer Details</div>
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label class="form-label">Specialization</label>
+              <input type="text" v-model="profileForm.specialization" class="form-input" placeholder="e.g. Hatha Yoga, Vinyasa" />
+            </div>
+            <div class="form-group flex-1">
+              <label class="form-label">Years of Experience</label>
+              <input type="number" v-model="profileForm.experience" class="form-input" min="0" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Certifications (comma separated)</label>
+            <input type="text" v-model="profileForm.certifications" class="form-input" placeholder="e.g. RYT-200, YAI" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Bio</label>
+            <textarea v-model="profileForm.bio" rows="4" class="form-input w-full resize-none" placeholder="Tell clients about yourself…"></textarea>
+          </div>
+
+          <div v-if="profileSuccess" class="info-banner-blue mb-3">✓ {{ profileSuccess }}</div>
+          <div style="display:flex;justify-content:flex-end">
             <button class="btn-primary" :disabled="profileSaving" @click="saveProfile">
               {{ profileSaving ? 'Saving…' : 'Save Changes' }}
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
 
-    <!-- ══ Notifications Bell ══ -->
-    <div class="notification-bell" @click="showNotifications = !showNotifications">
-      <span class="bell-icon">🔔</span>
-      <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount }}</span>
-    </div>
-    <div v-if="showNotifications" class="notifications-dropdown">
-      <div class="notifications-header">
-        <h4>Notifications</h4>
-        <button @click="markAllRead" class="btn-link">Mark all read</button>
-      </div>
-      <div class="notifications-list">
-        <div
-          v-for="n in notifications"
-          :key="n._id"
-          class="notification-item"
-          :class="{ unread: !n.read }"
-          @click="markNotifRead(n._id)"
-        >
-          <div class="notification-title">{{ n.title }}</div>
-          <div class="notification-message">{{ n.message }}</div>
-          <div class="notification-time">{{ formatDate(n.created_at) }}</div>
-        </div>
-        <div v-if="!notifications.length" class="no-notifications">No notifications</div>
-      </div>
-    </div>
+    </main>
 
-    <!-- ══ MODALS ══ -->
+    <!-- ══════ MODALS ══════ -->
 
     <!-- Query Modal -->
-    <div v-if="showQueryModal" class="modal-overlay" @click="showQueryModal = false">
-      <div class="modal-content" @click.stop>
-        <h3>Submit Query to Admin</h3>
+    <div v-if="showQueryModal" class="modal-backdrop" @click.self="showQueryModal = false">
+      <div class="modal-box">
+        <div class="modal-header">
+          <span class="modal-title">Submit Query to Admin</span>
+          <button class="modal-close" @click="showQueryModal = false">×</button>
+        </div>
         <div class="modal-body">
-          <div class="input-group">
-            <label>Subject</label>
-            <input type="text" v-model="queryForm.subject" />
+          <div class="form-group">
+            <label class="form-label">Subject</label>
+            <input type="text" v-model="queryForm.subject" class="form-input" />
           </div>
-          <div class="input-group">
-            <label>Message</label>
-            <textarea v-model="queryForm.message" rows="5"></textarea>
+          <div class="form-group">
+            <label class="form-label">Message</label>
+            <textarea v-model="queryForm.message" rows="5" class="form-input w-full resize-none"></textarea>
           </div>
         </div>
-        <div class="modal-actions">
+        <div class="modal-footer">
+          <button @click="showQueryModal = false" class="btn-cancel">Cancel</button>
           <button @click="submitQuery" class="btn-primary">Submit</button>
-          <button @click="showQueryModal = false" class="btn-secondary">Cancel</button>
         </div>
       </div>
     </div>
 
-    <!-- Plan Modal -->
-    <div v-if="showPlanModal" class="modal-overlay" @click="showPlanModal = false">
-      <div class="modal-content" @click.stop>
-        <h3>Create Yoga Plan</h3>
-        <div class="modal-body">
-          <div class="input-group">
-            <label>Client *</label>
-            <select v-model="planForm.client_id">
-              <option value="">— select client —</option>
-              <option v-for="c in clients" :key="c._id" :value="c._id">{{ c.name }}</option>
-            </select>
-          </div>
-          <div class="input-group">
-            <label>Plan Title *</label>
-            <input type="text" v-model="planForm.title" placeholder="e.g. 4-Week Flexibility Journey" />
-          </div>
-          <div class="input-group">
-            <label>Description</label>
-            <textarea v-model="planForm.description" rows="3"></textarea>
-          </div>
-          <div class="input-group">
-            <label>Duration (weeks)</label>
-            <input type="number" v-model="planForm.weeks" min="1" />
-          </div>
-          <div class="input-group">
-            <label>Sessions per Week</label>
-            <input type="number" v-model="planForm.sessions_per_week" min="1" />
-          </div>
-          <div class="input-group">
-            <label>Focus Areas (comma separated)</label>
-            <input type="text" v-model="planForm.focus_areas_str" placeholder="e.g. Flexibility, Strength, Balance" />
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button @click="createPlan" class="btn-primary">Create Plan</button>
-          <button @click="showPlanModal = false" class="btn-secondary">Cancel</button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -316,36 +392,43 @@ export default {
   data() {
     return {
       userName: localStorage.getItem('userName') || 'Trainer',
-      activeTab: 'clients',
-      tabs: [
-        { id: 'clients',  name: 'My Clients' },
-        { id: 'sessions', name: 'Sessions' },
-        { id: 'plans',    name: 'Yoga Plans' },
-        { id: 'reviews',  name: 'Reviews' },
-        { id: 'queries',  name: 'Queries' },
-        { id: 'profile',  name: '👤 Profile' }
-      ],
-      clients:       [],
-      sessions:      [],
-      plans:         [],
-      reviews:       [],
-      queries:       [],
-      notifications: [],
+      activeSection: 'overview',
+      sidebarCollapsed: false,
+      mobileSidebarOpen: false,
       showNotifications: false,
-      profile:       null,
-      profileForm:   { name: '', phone: '', specialization: '', experience: '', certifications: '', bio: '' },
-      profileSaving: false,
-      profileSuccess: '',
-      showPlanModal:   false,
-      showQueryModal:  false,
-      planForm: {
-        client_id: '',
-        title: '',
-        description: '',
-        weeks: 4,
-        sessions_per_week: 3,
-        focus_areas_str: ''
+      navItems: [
+        { id: 'overview',  icon: '🏠', label: 'Overview' },
+        { id: 'clients',   icon: '👥', label: 'My Clients' },
+        { id: 'sessions',  icon: '📅', label: 'Sessions' },
+        { id: 'reviews',   icon: '⭐', label: 'Reviews' },
+        { id: 'queries',   icon: '💬', label: 'Queries' },
+        { id: 'profile',   icon: '👤', label: 'Profile' },
+      ],
+      quickActions: [
+        { id: 'clients',  icon: '👥', label: 'View My Clients' },
+        { id: 'sessions', icon: '📅', label: 'View Sessions' },
+        { id: 'reviews',  icon: '⭐', label: 'Client Reviews' },
+        { id: 'queries',  icon: '💬', label: 'Submit Query' },
+        { id: 'profile',  icon: '👤', label: 'Edit Profile' },
+      ],
+      pageTitles: {
+        overview: 'Trainer Dashboard', clients: 'My Clients', sessions: 'My Sessions',
+        plans: 'Yoga Plans', reviews: 'Client Reviews', queries: 'Queries', profile: 'My Profile',
       },
+      clients: [], sessions: [], plans: [], reviews: [], queries: [], notifications: [],
+      selectedClient: null,
+      clientDetailTab: 'overview',
+      clientTabs: [
+        { id: 'overview',  label: '👤 Overview' },
+        { id: 'goals',     label: '🎯 Goals & Expectations' },
+        { id: 'health',    label: '⚕️ Health' },
+        { id: 'sessions',  label: '📅 Sessions' },
+      ],
+      profile: null,
+      profileForm: { name: '', phone: '', specialization: '', experience: '', certifications: '', bio: '' },
+      profileSaving: false, profileSuccess: '',
+      showPlanModal: false, showQueryModal: false,
+      planForm: { client_id: '', title: '', description: '', weeks: 4, sessions_per_week: 3, focus_areas_str: '' },
       queryForm: { subject: '', message: '' },
       pollInterval: null
     }
@@ -353,441 +436,317 @@ export default {
   computed: {
     avgRating() {
       if (!this.reviews.length) return 'N/A'
-      const sum = this.reviews.reduce((acc, r) => acc + r.rating, 0)
-      return (sum / this.reviews.length).toFixed(1)
+      return (this.reviews.reduce((a, r) => a + r.rating, 0) / this.reviews.length).toFixed(1)
     },
-    unreadCount() {
-      return this.notifications.filter(n => !n.read).length
-    }
+    unreadCount() { return this.notifications.filter(n => !n.read).length }
   },
-  async mounted() {
-    await this.loadData()
-    await this.loadProfile()
-    this.startPolling()
-  },
-  beforeUnmount() {
-    if (this.pollInterval) clearInterval(this.pollInterval)
-  },
+  async mounted() { await this.loadData(); await this.loadProfile(); this.startPolling() },
+  beforeUnmount() { if (this.pollInterval) clearInterval(this.pollInterval) },
   methods: {
+    navigate(section) { this.activeSection = section; this.mobileSidebarOpen = false; this.selectedClient = null },
+    openClientDetail(client) {
+      if (this.selectedClient?._id === client._id) { this.selectedClient = null; return }
+      this.selectedClient = client
+      this.clientDetailTab = 'overview'
+    },
+    getClientSessions(clientId) {
+      return this.sessions.filter(s => s.client_id === clientId || s.client?.id === clientId)
+    },
+    statusPill(status) {
+      const base = 'status-pill '
+      const map = { active: base+'status-active', completed: base+'status-completed', scheduled: base+'status-scheduled', cancelled: base+'status-cancelled', pending: base+'status-pending', resolved: base+'status-active', approved: base+'status-active', rejected: base+'status-blocked' }
+      return map[status] || base+'status-default'
+    },
+    getClientName(clientId) { const c = this.clients.find(c => c._id === clientId); return c ? c.name : 'Unknown' },
     async loadData() {
       const [clientsR, sessionsR, plansR, reviewsR, queriesR, notifsR] = await Promise.all([
-        api.getTrainerClients(),
-        api.getTrainerSessions(),
-        api.getTrainerPlans(),
-        api.getTrainerReviews(),
-        api.getTrainerQueries(),
-        api.getNotifications()
+        api.getTrainerClients(), api.getTrainerSessions(), api.getTrainerPlans(),
+        api.getTrainerReviews(), api.getTrainerQueries(), api.getNotifications()
       ])
-
-      // All return { success, items }
-      this.clients       = clientsR.items   || []
-      this.sessions      = sessionsR.items  || []
-      this.plans         = plansR.items     || []
-      this.reviews       = reviewsR.items   || []
-      this.queries       = queriesR.items   || []
-      this.notifications = notifsR.items    || []
+      this.clients = clientsR.items || []; this.sessions = sessionsR.items || []
+      this.plans = plansR.items || []; this.reviews = reviewsR.items || []
+      this.queries = queriesR.items || []; this.notifications = notifsR.items || []
     },
-
     startPolling() {
       this.pollInterval = setInterval(async () => {
         const r = await api.getNotifications(true)
-        if (r.success) {
-          const newUnread = (r.items || []).length
-          if (newUnread > this.unreadCount) {
-            await this.loadData()
-          }
-        }
+        if (r.success && (r.items || []).length > this.unreadCount) await this.loadData()
       }, 30000)
     },
-
-    getClientName(clientId) {
-      const c = this.clients.find(c => c._id === clientId)
-      return c ? c.name : 'Unknown'
-    },
-
-    // Sessions — mark attendance only (no create)
     async markAttendance(sessionId) {
       const r = await api.markAttendance(sessionId)
-      if (r.success) {
-        await this.loadData()
-      } else {
-        alert(r.error || 'Failed to mark attendance')
-      }
+      if (r.success) await this.loadData()
+      else alert(r.error || 'Failed to mark attendance')
     },
-
-    // Yoga plans
     openPlanModal(client) {
-      this.planForm = {
-        client_id: client ? client._id : '',
-        title: '',
-        description: '',
-        weeks: 4,
-        sessions_per_week: 3,
-        focus_areas_str: ''
-      }
+      this.planForm = { client_id: client ? client._id : '', title: '', description: '', weeks: 4, sessions_per_week: 3, focus_areas_str: '' }
       this.showPlanModal = true
     },
     async createPlan() {
-      if (!this.planForm.client_id || !this.planForm.title) {
-        alert('Please fill in required fields')
-        return
-      }
-      const data = {
-        ...this.planForm,
-        focus_areas: this.planForm.focus_areas_str.split(',').map(s => s.trim()).filter(Boolean)
-      }
+      if (!this.planForm.client_id || !this.planForm.title) { alert('Please fill in required fields'); return }
+      const data = { ...this.planForm, focus_areas: this.planForm.focus_areas_str.split(',').map(s => s.trim()).filter(Boolean) }
       const r = await api.createPlan(data)
-      if (r.success) {
-        this.showPlanModal = false
-        await this.loadData()
-      } else {
-        alert(r.error || 'Failed to create plan')
-      }
+      if (r.success) { this.showPlanModal = false; await this.loadData() }
+      else alert(r.error || 'Failed to create plan')
     },
     async updateProgress(planId, currentProgress) {
       const input = prompt('Enter progress percentage (0–100):', currentProgress || 0)
       if (input === null) return
       const progress = parseInt(input)
-      if (isNaN(progress) || progress < 0 || progress > 100) {
-        alert('Please enter a number between 0 and 100')
-        return
-      }
+      if (isNaN(progress) || progress < 0 || progress > 100) { alert('Please enter a number between 0 and 100'); return }
       const r = await api.updatePlanProgress(planId, progress)
-      if (r.success) {
-        await this.loadData()
-      } else {
-        alert(r.error || 'Failed to update progress')
-      }
+      if (r.success) await this.loadData()
+      else alert(r.error || 'Failed to update progress')
     },
-
-    // Queries
     async submitQuery() {
-      if (!this.queryForm.subject || !this.queryForm.message) {
-        alert('Please fill in all fields')
-        return
-      }
+      if (!this.queryForm.subject || !this.queryForm.message) { alert('Please fill in all fields'); return }
       const r = await api.createTrainerQuery(this.queryForm.subject, this.queryForm.message)
-      if (r.success) {
-        this.showQueryModal = false
-        this.queryForm = { subject: '', message: '' }
-        await this.loadData()
-      } else {
-        alert(r.error || 'Failed to submit query')
-      }
+      if (r.success) { this.showQueryModal = false; this.queryForm = { subject: '', message: '' }; await this.loadData() }
+      else alert(r.error || 'Failed to submit query')
     },
-
-    // Notifications
-    async markNotifRead(id) {
-      await api.markNotificationRead(id)
-      this.notifications = this.notifications.map(n => n._id === id ? { ...n, read: true } : n)
-    },
-    async markAllRead() {
-      await api.markAllRead()
-      this.notifications = this.notifications.map(n => ({ ...n, read: true }))
-    },
-
-    // Profile
+    async markNotifRead(id) { await api.markNotificationRead(id); this.notifications = this.notifications.map(n => n._id === id ? { ...n, read: true } : n) },
+    async markAllRead() { await api.markAllRead(); this.notifications = this.notifications.map(n => ({ ...n, read: true })) },
     async loadProfile() {
       try {
         const stored = localStorage.getItem('user')
-        if (stored) {
-          const user = JSON.parse(stored)
-          this.profile = user
-          this._fillProfileForm(user)
-        }
-        const res = await fetch('/api/auth/me', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        })
-        if (res.ok) {
-          const user = await res.json()
-          this.profile = user
-          localStorage.setItem('user', JSON.stringify(user))
-          localStorage.setItem('userName', user.name)
-          this._fillProfileForm(user)
-        }
-      } catch (e) { /* silent */ }
+        if (stored) { const user = JSON.parse(stored); this.profile = user; this._fillProfileForm(user) }
+        const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+        if (res.ok) { const user = await res.json(); this.profile = user; localStorage.setItem('user', JSON.stringify(user)); localStorage.setItem('userName', user.name); this._fillProfileForm(user) }
+      } catch (e) {}
     },
     _fillProfileForm(user) {
-      this.profileForm.name   = user.name  || ''
-      this.profileForm.phone  = user.phone || ''
+      this.profileForm.name = user.name || ''; this.profileForm.phone = user.phone || ''
       const td = user.trainer_details || {}
-      this.profileForm.specialization  = td.specialization || ''
-      this.profileForm.experience      = td.experience     || ''
-      this.profileForm.certifications  = Array.isArray(td.certifications)
-        ? td.certifications.join(', ')
-        : (td.certifications || '')
+      this.profileForm.specialization = td.specialization || ''; this.profileForm.experience = td.experience || ''
+      this.profileForm.certifications = Array.isArray(td.certifications) ? td.certifications.join(', ') : (td.certifications || '')
       this.profileForm.bio = td.bio || ''
     },
     async saveProfile() {
-      this.profileSaving = true
-      this.profileSuccess = ''
+      this.profileSaving = true; this.profileSuccess = ''
       try {
-        const payload = {
-          name:           this.profileForm.name,
-          phone:          this.profileForm.phone,
-          specialization: this.profileForm.specialization,
-          experience:     parseInt(this.profileForm.experience) || 0,
-          certifications: this.profileForm.certifications,
-          bio:            this.profileForm.bio
-        }
-        const res = await fetch('/api/auth/profile', {
-          method:  'PUT',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
-          body:    JSON.stringify(payload)
-        })
-        if (res.ok) {
-          const data = await res.json()
-          localStorage.setItem('userName', data.user.name)
-          this.userName = data.user.name
-          this.profileSuccess = 'Profile updated successfully!'
-          setTimeout(() => this.profileSuccess = '', 3000)
-        }
-      } catch (e) { /* silent */ } finally {
-        this.profileSaving = false
-      }
+        const payload = { name: this.profileForm.name, phone: this.profileForm.phone, specialization: this.profileForm.specialization, experience: parseInt(this.profileForm.experience) || 0, certifications: this.profileForm.certifications, bio: this.profileForm.bio }
+        const res = await fetch('/api/auth/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify(payload) })
+        if (res.ok) { const data = await res.json(); localStorage.setItem('userName', data.user.name); this.userName = data.user.name; this.profileSuccess = 'Profile updated!'; setTimeout(() => this.profileSuccess = '', 3000) }
+      } catch (e) {} finally { this.profileSaving = false }
     },
-
-    formatDate(d) {
-      if (!d) return '—'
-      return new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
-    }
+    formatDate(d) { if (!d) return '—'; return new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) }
   }
 }
 </script>
 
 <style scoped>
-.trainer-dashboard {
-  max-width: 1400px;
-  margin: 100px auto 60px;
-  padding: 0 40px;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-.empty-state {
-  padding: 60px 0;
-  text-align: center;
-  color: var(--text-soft);
-  font-size: 14px;
-  background: white;
-  border-radius: 8px;
-}
+.sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 45; backdrop-filter: blur(2px); }
+.hamburger-btn { display: none; flex-direction: column; justify-content: center; gap: 5px; background: none; border: none; cursor: pointer; padding: 6px; border-radius: 8px; flex-shrink: 0; transition: background 0.15s; }
+.hamburger-btn:hover { background: #f3f4f6; }
+.hamburger-line { display: block; width: 20px; height: 2px; background: #374151; border-radius: 2px; }
 
-.info-notice {
-  font-size: 12px;
-  color: var(--text-soft);
-  background: #f0f7ef;
-  border: 1px solid #c8e6c9;
-  padding: 8px 14px;
-  border-radius: 20px;
-}
+.dashboard-root { display: flex; min-height: 100vh; background: #f5f4f0; font-family: 'Inter', sans-serif; }
 
-.dashboard-header { margin-bottom: 40px; }
-.dashboard-header h1 { font-size: 36px; font-family: 'Cormorant Garamond', serif; color: var(--text-dark); margin-bottom: 8px; }
-.dashboard-header p  { color: var(--text-soft); }
+.sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 220px; background: #1a1f1a; display: flex; flex-direction: column; z-index: 50; transition: width 0.25s ease; overflow: hidden; }
+.sidebar--collapsed { width: 64px; }
+.sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
+.sidebar-logo { font-size: 20px; flex-shrink: 0; }
+.sidebar-name { color: white; font-family: 'Lora', serif; font-size: 17px; white-space: nowrap; }
+.sidebar-nav { flex: 1; padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 13px; color: rgba(255,255,255,0.5); background: none; border: none; width: 100%; text-align: left; transition: background 0.15s, color 0.15s; white-space: nowrap; }
+.nav-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85); }
+.nav-item--active { background: #4a7c59; color: white; }
+.nav-icon { font-size: 16px; flex-shrink: 0; }
+.nav-label { flex: 1; }
+.sidebar-toggle { background: none; border: none; border-top: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.3); font-size: 18px; cursor: pointer; padding: 12px; text-align: right; transition: color 0.15s; flex-shrink: 0; }
+.sidebar-toggle:hover { color: rgba(255,255,255,0.6); }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-  margin-bottom: 40px;
-}
-.stat-card {
-  background: white; padding: 24px; border-radius: 12px;
-  display: flex; align-items: center; gap: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.04); transition: transform .3s;
-}
-.stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.08); }
-.stat-icon  { font-size: 32px; }
-.stat-value { font-size: 28px; font-weight: 600; color: var(--sage); font-family: 'Cormorant Garamond', serif; }
-.stat-label { font-size: 12px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 1px; }
+.main-content { margin-left: 220px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; transition: margin-left 0.25s ease; }
+.main-content--collapsed { margin-left: 64px; }
 
-.tabs {
-  display: flex; gap: 4px; border-bottom: 1px solid #e0e0d8; margin-bottom: 32px; flex-wrap: wrap;
-}
-.tabs button {
-  padding: 12px 20px; background: none; border: none;
-  font-size: 13px; font-weight: 500; color: var(--text-soft);
-  cursor: pointer; transition: all .3s; position: relative; white-space: nowrap;
-}
-.tabs button.active { color: var(--sage); }
-.tabs button.active::after {
-  content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
-  height: 2px; background: var(--sage);
-}
+.topbar { position: sticky; top: 0; z-index: 40; background: white; border-bottom: 1px solid #e5e7eb; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+.topbar-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 24px; gap: 16px; }
+.topbar-left { display: flex; align-items: center; gap: 12px; }
+.page-title { font-family: 'Lora', serif; font-size: 20px; color: #111827; font-weight: 500; }
+.topbar-right { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.notif-btn { position: relative; cursor: pointer; font-size: 20px; padding: 4px; }
+.notif-dot { position: absolute; top: -4px; right: -4px; background: #ef4444; color: white; font-size: 10px; font-weight: 600; min-width: 16px; height: 16px; border-radius: 99px; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
+.notif-dropdown { position: absolute; top: 64px; right: 16px; width: 340px; background: white; border: 1px solid #e5e7eb; border-radius: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); z-index: 200; overflow: hidden; }
+.notif-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #f3f4f6; }
+.notif-title { font-size: 14px; font-weight: 600; color: #1f2937; }
+.notif-list { max-height: 360px; overflow-y: auto; }
+.notif-item { padding: 12px 16px; border-bottom: 1px solid #f9fafb; cursor: pointer; transition: background 0.15s; }
+.notif-item:hover { background: #fafaf8; }
+.notif-item--unread { background: #f0f9f4; border-left: 3px solid #4a7c59; }
+.notif-item-title { font-size: 13px; font-weight: 600; color: #1f2937; margin-bottom: 2px; }
+.notif-item-msg { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+.notif-item-time { font-size: 11px; color: #9ca3af; }
+.user-chip { display: flex; align-items: center; gap: 8px; }
+.user-avatar { width: 32px; height: 32px; border-radius: 50%; background: #7c6a4a; color: white; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; }
+.user-name { font-size: 13px; color: #6b7280; }
 
-.section-header {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;
-}
-.section-header h2 { font-size: 24px; font-family: 'Cormorant Garamond', serif; }
+.page-section { padding: 24px; flex: 1; }
+.card { background: white; border-radius: 16px; border: 1px solid #f0f0ee; box-shadow: 0 1px 4px rgba(0,0,0,0.04); padding: 20px; }
+.card-title { font-family: 'Lora', serif; font-size: 16px; color: #1f2937; font-weight: 500; margin-bottom: 16px; }
+.section-heading { font-family: 'Lora', serif; font-size: 18px; color: #1f2937; font-weight: 500; }
 
-.clients-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;
-}
-.client-card {
-  background: white; padding: 20px; border-radius: 8px;
-  display: flex; align-items: center; gap: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.04);
-}
-.client-avatar {
-  width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--sage), var(--deep));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 20px; color: white;
-}
-.client-info { flex: 1; }
-.client-info h4 { margin-bottom: 4px; }
-.client-info p  { font-size: 12px; color: var(--text-soft); margin-bottom: 4px; }
-.client-stats   { font-size: 11px; color: var(--text-mid); }
-.client-actions { display: flex; flex-direction: column; gap: 6px; }
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+.stat-card { background: white; border-radius: 16px; border: 1px solid #f0f0ee; box-shadow: 0 1px 4px rgba(0,0,0,0.04); padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.stat-icon-wrap { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.stat-number { font-family: 'Lora', serif; font-size: 28px; color: #111827; font-weight: 500; }
+.stat-label { font-size: 12px; color: #9ca3af; margin-top: 3px; }
 
-.sessions-list, .plans-list, .reviews-list, .queries-list {
-  display: flex; flex-direction: column; gap: 16px;
-}
-.session-card, .plan-card, .review-card, .query-card {
-  background: white; padding: 20px; border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.04);
-}
-.session-header, .plan-header, .query-header {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
-}
-.session-title, .plan-title, .query-subject {
-  font-weight: 600; font-size: 16px; color: var(--text-dark);
-}
-.session-status {
-  padding: 4px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase;
-}
-.session-status.scheduled { background: #fff3e0; color: #f57c00; }
-.session-status.completed { background: #e8f5e9; color: #2e7d32; }
-.session-status.cancelled { background: #ffebee; color: #c62828; }
-.session-client, .session-date, .session-duration, .session-notes { font-size: 12px; color: var(--text-soft); margin-bottom: 4px; }
-.session-actions { margin-top: 10px; display: flex; gap: 8px; }
+.quick-actions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.quick-action-btn { display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: 10px; border: 1px solid #f0f0ee; background: white; cursor: pointer; text-align: left; transition: border-color 0.15s, background 0.15s; }
+.quick-action-btn:hover { border-color: rgba(74,124,89,0.3); background: rgba(74,124,89,0.04); }
+.qa-icon { font-size: 22px; }
+.qa-label { font-size: 13px; font-weight: 500; color: #374151; }
 
-.plan-progress { background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 4px; font-size: 11px; }
-.plan-client   { font-size: 13px; color: var(--text-mid); margin-bottom: 8px; }
-.plan-details  { display: flex; gap: 16px; font-size: 12px; color: var(--text-soft); margin-bottom: 6px; }
-.plan-focus    { font-size: 12px; color: var(--sage); margin-bottom: 6px; }
-.plan-description { font-size: 13px; color: var(--text-mid); margin-bottom: 8px; }
-.plan-actions  { margin-top: 10px; display: flex; gap: 8px; }
-.progress-bar  { height: 6px; background: #f0f0e8; border-radius: 3px; overflow: hidden; margin-top: 10px; }
-.progress-fill { height: 100%; background: var(--sage); transition: width .3s; }
+.clients-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.client-card { background: white; border-radius: 16px; border: 1px solid #f0f0ee; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); display: flex; align-items: flex-start; gap: 16px; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
+.client-card:hover { border-color: rgba(74,124,89,0.3); box-shadow: 0 4px 12px rgba(74,124,89,0.08); }
+.client-card--selected { border-color: #4a7c59; box-shadow: 0 4px 16px rgba(74,124,89,0.15); }
+.client-avatar { width: 48px; height: 48px; border-radius: 50%; background: rgba(124,106,74,0.15); color: #7c6a4a; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; flex-shrink: 0; }
+.client-info { flex: 1; min-width: 0; }
+.client-actions { flex-shrink: 0; }
+.client-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.health-warn { font-size: 11px; color: #b45309; background: #fef3c7; border-radius: 6px; padding: 3px 8px; line-height: 1.4; }
+.view-detail-btn { flex-shrink: 0; padding: 5px 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; color: #6b7280; font-size: 11px; cursor: pointer; align-self: flex-start; transition: all 0.15s; }
+.view-detail-btn:hover { background: #4a7c59; color: white; border-color: #4a7c59; }
 
-.query-status { padding: 4px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase; }
-.query-status.pending  { background: #fff3e0; color: #f57c00; }
-.query-status.resolved { background: #e8f5e9; color: #2e7d32; }
-.query-message  { font-size: 13px; color: var(--text-mid); margin-bottom: 8px; }
-.query-response { background: #f8f9fa; padding: 10px; border-radius: 4px; margin: 8px 0; font-size: 13px; }
-.query-date     { font-size: 11px; color: var(--text-soft); }
+/* ── CLIENT DETAIL PANEL ── */
+.client-detail-panel { background: white; border-radius: 16px; border: 2px solid #4a7c59; box-shadow: 0 4px 20px rgba(74,124,89,0.12); overflow: hidden; }
+.cdp-header { display: flex; align-items: flex-start; gap: 16px; padding: 20px; background: linear-gradient(135deg, #1a1f1a, #2d4a38); }
+.cdp-avatar { width: 56px; height: 56px; border-radius: 50%; background: #c9a84c; color: #1a1f1a; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; flex-shrink: 0; }
+.cdp-header-info { flex: 1; }
+.cdp-name { font-family: 'Lora', serif; font-size: 20px; color: white; margin-bottom: 6px; }
+.cdp-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: rgba(255,255,255,0.6); }
+.cdp-close { background: rgba(255,255,255,0.1); border: none; color: white; font-size: 20px; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s; }
+.cdp-close:hover { background: rgba(255,255,255,0.2); }
+.cdp-tabs { display: flex; border-bottom: 1px solid #f0f0ee; padding: 0 16px; gap: 4px; background: #fafaf8; }
+.cdp-tab { background: none; border: none; padding: 12px 14px; font-size: 12px; font-weight: 500; color: #9ca3af; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
+.cdp-tab:hover { color: #374151; }
+.cdp-tab--active { color: #4a7c59; border-bottom-color: #4a7c59; }
+.cdp-body { padding: 20px; }
+.cdp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.cdp-field { background: #f9fafb; border-radius: 10px; padding: 12px 14px; }
+.cdp-field-label { display: block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #9ca3af; margin-bottom: 4px; }
+.cdp-field-value { font-size: 14px; color: #1f2937; font-weight: 500; }
+.cdp-badge-exp { display: inline-block; background: #eff6ff; color: #2563eb; font-size: 11px; padding: 3px 10px; border-radius: 99px; font-weight: 500; text-transform: capitalize; }
+.cdp-block { margin-bottom: 16px; }
+.cdp-block:last-child { margin-bottom: 0; }
+.cdp-block-label { font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+.cdp-block-text { font-size: 14px; color: #374151; line-height: 1.7; background: #f9fafb; border-radius: 10px; padding: 14px; border-left: 3px solid #4a7c59; }
+.cdp-block-text--warn { border-left-color: #f59e0b; background: #fffbeb; color: #92400e; }
 
-.review-rating  { color: var(--gold); font-size: 18px; margin-bottom: 6px; }
-.review-client  { font-weight: 500; margin-bottom: 6px; }
-.review-comment { font-style: italic; margin-bottom: 6px; }
-.review-date    { font-size: 11px; color: var(--text-soft); }
+.plans-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.plan-card { background: white; border-radius: 16px; border: 1px solid #f0f0ee; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+.plan-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.plan-title { font-family: 'Lora', serif; font-size: 16px; color: #111827; font-weight: 500; }
+.plan-pct { background: #f0fdf4; color: #16a34a; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 99px; }
+.plan-desc { font-size: 12px; color: #9ca3af; margin-bottom: 10px; line-height: 1.5; }
+.plan-meta { display: flex; gap: 12px; font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+.plan-focus { font-size: 12px; color: #4a7c59; margin-bottom: 8px; }
+.progress-bar-bg { height: 8px; background: #f3f4f6; border-radius: 99px; overflow: hidden; }
+.progress-bar-fill { height: 100%; background: #4a7c59; border-radius: 99px; transition: width 0.4s ease; }
+.progress-note { font-size: 11px; color: #9ca3af; margin-top: 6px; }
 
-/* Notification Bell */
-.notification-bell {
-  position: fixed; top: 100px; right: 40px;
-  width: 48px; height: 48px; background: white; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,.1);
-  transition: all .3s; z-index: 100;
-}
-.notification-bell:hover { transform: scale(1.05); }
-.bell-icon { font-size: 24px; }
-.notification-badge {
-  position: absolute; top: -5px; right: -5px;
-  background: #f44336; color: white; font-size: 11px;
-  padding: 2px 6px; border-radius: 10px;
-}
-.notifications-dropdown {
-  position: fixed; top: 160px; right: 40px; width: 350px;
-  background: white; border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,.15); z-index: 101; overflow: hidden;
-}
-.notifications-header {
-  padding: 16px; border-bottom: 1px solid #f0f0e8;
-  display: flex; justify-content: space-between; align-items: center;
-}
-.notifications-header h4 { font-size: 16px; }
-.notifications-list { max-height: 400px; overflow-y: auto; }
-.notification-item {
-  padding: 12px 16px; border-bottom: 1px solid #f0f0e8;
-  cursor: pointer; transition: background .3s;
-}
-.notification-item:hover { background: #fafaf5; }
-.notification-item.unread { background: #f0f7ef; border-left: 3px solid var(--sage); }
-.notification-title   { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
-.notification-message { font-size: 12px; color: var(--text-mid); margin-bottom: 4px; }
-.notification-time    { font-size: 10px; color: var(--text-soft); }
-.no-notifications     { padding: 40px; text-align: center; color: var(--text-soft); }
+.list-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.query-row { padding: 16px 0; border-bottom: 1px solid #f3f4f6; }
+.query-row:last-child { border-bottom: none; }
+.query-response { background: rgba(74,124,89,0.06); border-left: 2px solid #4a7c59; border-radius: 6px; padding: 10px 12px; font-size: 13px; color: #374151; margin-top: 8px; }
+.query-response-label { font-size: 11px; font-weight: 600; color: #4a7c59; text-transform: uppercase; letter-spacing: 0.05em; }
+.review-stars { font-size: 18px; letter-spacing: 1px; color: #f59e0b; }
 
-/* Buttons */
-.btn-primary { background: var(--sage); color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; transition: all .3s; }
-.btn-primary:hover { background: var(--sage-dark); }
-.btn-primary.small { padding: 6px 12px; font-size: 12px; }
-.btn-secondary { background: #f5f5f0; border: 1px solid #e0e0d8; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
-.btn-link { background: none; border: none; color: var(--sage); cursor: pointer; font-size: 12px; text-decoration: underline; }
-.btn-approve { background: var(--sage); color: white; border: none; border-radius: 4px; cursor: pointer; }
-.btn-approve.small { padding: 4px 10px; font-size: 11px; }
+.detail-header { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.detail-avatar { width: 60px; height: 60px; border-radius: 14px; color: white; font-family: 'Lora', serif; font-size: 24px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.detail-info { flex: 1; }
+.detail-name { font-family: 'Lora', serif; font-size: 22px; color: #111827; margin-bottom: 8px; }
+.detail-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { display: inline-block; background: #f3f4f6; color: #6b7280; font-size: 12px; padding: 3px 10px; border-radius: 99px; }
 
-/* Modal */
-.modal-overlay {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,.5);
-  display: flex; align-items: center; justify-content: center; z-index: 2000;
-}
-.modal-content {
-  background: white; padding: 32px; border-radius: 12px;
-  min-width: 450px; max-width: 550px; max-height: 80vh; overflow-y: auto; width: 100%;
-}
-.modal-content h3 { margin-bottom: 24px; font-size: 20px; }
-.modal-body { margin-bottom: 24px; }
-.input-group { margin-bottom: 16px; }
-.input-group label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--text-mid); }
-.input-group input, .input-group select, .input-group textarea {
-  width: 100%; padding: 10px 12px; border: 1px solid #e0e0d8;
-  border-radius: 6px; font-size: 14px; font-family: inherit; box-sizing: border-box;
-}
-.input-group input:focus, .input-group select:focus, .input-group textarea:focus {
-  outline: none; border-color: var(--sage);
-}
-.modal-actions { display: flex; gap: 12px; justify-content: flex-end; }
+.form-section-label { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: #4a7c59; margin: 20px 0 12px; font-weight: 500; }
+.form-row { display: flex; gap: 14px; flex-wrap: wrap; }
+.form-row .form-group { min-width: 0; }
+.flex-1 { flex: 1; min-width: 120px; }
 
-/* Profile */
-.profile-card { background: white; border-radius: 12px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
-.profile-avatar-row { display: flex; align-items: center; gap: 20px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid rgba(0,0,0,.06); }
-.profile-avatar-img { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(124,154,109,.2); }
-.profile-avatar-fallback {
-  width: 72px; height: 72px; border-radius: 50%; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--sage), var(--deep));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 28px; color: white; font-family: 'Cormorant Garamond', serif;
-}
-.profile-meta { flex: 1; }
-.profile-name  { font-size: 22px; font-weight: 600; color: var(--text-dark); margin-bottom: 4px; }
-.profile-email { font-size: 13px; color: var(--text-soft); margin-bottom: 10px; }
-.profile-status-badge { display: inline-block; font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 500; }
-.profile-status-badge.active  { background: #e8f5e9; color: #2e7d32; }
-.profile-status-badge.pending { background: #fff3e0; color: #f57c00; }
-.profile-section-label { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--sage); margin: 24px 0 16px; font-weight: 500; }
-.pf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.pf-group { display: flex; flex-direction: column; gap: 6px; }
-.pf-group.pf-full { grid-column: 1 / -1; }
-.pf-group label { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-mid); font-weight: 500; }
-.pf-group input, .pf-group textarea {
-  padding: 10px 12px; border: 1px solid rgba(0,0,0,.1); border-radius: 6px;
-  font-size: 14px; font-family: inherit; color: var(--text-dark); transition: border-color .2s;
-}
-.pf-group input:focus, .pf-group textarea:focus { outline: none; border-color: var(--sage); box-shadow: 0 0 0 3px rgba(124,154,109,.1); }
-.pf-group textarea { resize: vertical; min-height: 100px; }
-.profile-success { margin: 16px 0; padding: 10px 14px; background: #e8f5e9; color: #2e7d32; border-radius: 6px; font-size: 13px; }
-.pf-actions { margin-top: 24px; display: flex; justify-content: flex-end; }
+.table-wrap { overflow-x: auto; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table th { background: #f9fafb; padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; border-bottom: 1px solid #f3f4f6; }
+.data-table td { padding: 12px 16px; color: #4b5563; border-bottom: 1px solid #f9fafb; vertical-align: middle; }
+.data-table tr:last-child td { border-bottom: none; }
+
+.status-pill { display: inline-block; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 99px; white-space: nowrap; }
+.status-active { background: #f0fdf4; color: #16a34a; }
+.status-pending { background: #fef3c7; color: #d97706; }
+.status-blocked { background: #fef2f2; color: #dc2626; }
+.status-completed { background: #eff6ff; color: #2563eb; }
+.status-scheduled { background: #f5f3ff; color: #7c3aed; }
+.status-cancelled { background: #f9fafb; color: #9ca3af; }
+.status-default { background: #f9fafb; color: #6b7280; }
+
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+.modal-box { background: white; border-radius: 18px; width: 520px; max-width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.15); animation: modal-in 0.2s ease; }
+@keyframes modal-in { from { transform: scale(0.96) translateY(8px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid #f3f4f6; }
+.modal-title { font-family: 'Lora', serif; font-size: 18px; color: #111827; }
+.modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: #9ca3af; padding: 0 4px; }
+.modal-close:hover { color: #374151; }
+.modal-body { padding: 22px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px; border-top: 1px solid #f3f4f6; }
+
+.form-input { width: 100%; padding: 9px 12px; border: 1px solid #e5e7eb; border-radius: 7px; font-size: 13px; font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.15s; background: white; color: #1f2937; }
+.form-input:focus { border-color: #4a7c59; }
+.form-group { margin-bottom: 14px; }
+.form-label { display: block; font-size: 12px; font-weight: 500; color: #6b7280; margin-bottom: 5px; }
+.resize-none { resize: none; }
+.w-full { width: 100%; }
+
+.btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; background: #4a7c59; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s; white-space: nowrap; font-family: 'Inter', sans-serif; }
+.btn-primary:hover:not(:disabled) { background: #3a6147; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-cancel { display: inline-flex; align-items: center; padding: 9px 18px; background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif; }
+.btn-cancel:hover { background: #e5e7eb; }
+.btn-link { background: none; border: none; color: #4a7c59; cursor: pointer; font-size: 13px; font-weight: 500; text-decoration: underline; }
+.micro-approve { padding: 5px 12px; border: none; border-radius: 5px; cursor: pointer; font-size: 11px; font-weight: 500; background: #f0fdf4; color: #16a34a; font-family: 'Inter', sans-serif; transition: all 0.12s; }
+.micro-approve:hover { background: #16a34a; color: white; }
+
+.info-banner { display: flex; align-items: center; gap: 10px; background: #fef3c7; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #92400e; }
+.info-banner-blue { display: flex; align-items: center; gap: 8px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #1d4ed8; }
+.empty-state { text-align: center; padding: 48px 20px; color: #9ca3af; font-size: 13px; background: white; border-radius: 16px; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.text-muted { color: #9ca3af; }
+.text-xs { font-size: 11px; }
+.text-sm { font-size: 13px; }
+.font-medium { font-weight: 500; }
+.mb-1 { margin-bottom: 4px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.mb-4 { margin-bottom: 16px; }
+.mt-1 { margin-top: 4px; }
+.mt-3 { margin-top: 12px; }
+
+@media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
 
 @media (max-width: 768px) {
-  .trainer-dashboard { padding: 80px 20px 40px; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .sidebar-overlay { display: block; }
+  .hamburger-btn { display: flex; }
+  .sidebar { transform: translateX(-100%); transition: transform 0.25s ease; width: 220px !important; }
+  .sidebar--mobile-open { transform: translateX(0); }
+  .main-content { margin-left: 0 !important; }
+  .sidebar-toggle { display: none; }
+  .topbar-inner { padding: 0 14px; }
+  .user-name { display: none; }
+  .page-title { font-size: 16px; }
+  .page-section { padding: 14px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .quick-actions-grid { grid-template-columns: repeat(2, 1fr); }
   .clients-grid { grid-template-columns: 1fr; }
-  .modal-content { min-width: 300px; margin: 20px; }
-  .pf-grid { grid-template-columns: 1fr; }
-  .notifications-dropdown { width: calc(100% - 40px); right: 20px; }
-  .notification-bell { right: 20px; }
+  .cdp-tabs { overflow-x: auto; }
+  .cdp-grid { grid-template-columns: repeat(2, 1fr); }
+  .notif-dropdown { right: 8px; width: calc(100vw - 16px); }
+  .list-toolbar { flex-direction: column; align-items: flex-start; }
+}
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .quick-actions-grid { grid-template-columns: 1fr 1fr; }
+  .page-section { padding: 10px; }
 }
 </style>

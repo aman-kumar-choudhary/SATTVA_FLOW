@@ -312,13 +312,24 @@ class PackageModel(BaseModel):
         super().__init__(db, self.COLLECTION)
     
     def create(self, data, admin_id):
+        duration_weeks = int(data.get('duration_weeks', 4))
+        sessions_per_week = int(data.get('sessions_per_week', 0))
+        sessions_count = int(data.get('sessions_count', 0))
+
+        # Derive whichever field is missing
+        if sessions_per_week > 0 and sessions_count == 0:
+            sessions_count = sessions_per_week * duration_weeks
+        elif sessions_count > 0 and sessions_per_week == 0:
+            sessions_per_week = max(1, round(sessions_count / duration_weeks)) if duration_weeks else 1
+
         doc = {
             'title': data.get('title'),
             'description': data.get('description', ''),
             'price': float(data.get('price', 0)),
             'currency': data.get('currency', 'INR'),
-            'duration_weeks': int(data.get('duration_weeks', 4)),
-            'sessions_count': int(data.get('sessions_count', 8)),
+            'duration_weeks': duration_weeks,
+            'sessions_per_week': sessions_per_week,
+            'sessions_count': sessions_count,
             'features': data.get('features', []),
             'is_active': data.get('is_active', True),
             'is_featured': data.get('is_featured', False),
@@ -706,17 +717,24 @@ class QueryModel(BaseModel):
         query = {}
         if status:
             query['status'] = status
-        
+
         skip = (page - 1) * per_page
         docs = list(self.collection.find(query).sort('created_at', -1).skip(skip).limit(per_page))
         total = self.collection.count_documents(query)
-        
+
         return {
             'items': [serialize_doc(d) for d in docs],
             'total': total,
             'page': page,
             'pages': (total + per_page - 1) // per_page
         }
+
+    def get_all_for_user(self, user_id):
+        """Return all queries for a given user (unpaginated) — used by admin client-detail view."""
+        docs = list(
+            self.collection.find({'sender_id': str(user_id)}).sort('created_at', -1)
+        )
+        return [serialize_doc(d) for d in docs]
 
 class ReviewModel(BaseModel):
     """Collection: reviews - Client reviews for trainers (admin moderated)"""
@@ -778,6 +796,13 @@ class ReviewModel(BaseModel):
             'pages': (total + per_page - 1) // per_page
         }
     
+    def get_client_reviews(self, client_id):
+        """Return all reviews submitted by a client — serialized to avoid ObjectId errors."""
+        docs = list(
+            self.collection.find({'client_id': str(client_id)}).sort('created_at', -1)
+        )
+        return [serialize_doc(d) for d in docs]
+
     def has_reviewed(self, client_id, trainer_id):
         return self.collection.count_documents({
             'client_id': str(client_id),
@@ -818,3 +843,244 @@ class ActivityLogModel(BaseModel):
             'page': page,
             'pages': (total + per_page - 1) // per_page
         }
+
+
+class SubscriptionModel(BaseModel):
+    """Collection: subscriptions
+    Tracks which client enrolled in which package,
+    how many sessions are total/completed/pending.
+    """
+    COLLECTION = 'subscriptions'
+ 
+    def __init__(self, db):
+        super().__init__(db, self.COLLECTION)
+        self.collection.create_index([('client_id', 1), ('status', 1)])
+        self.collection.create_index([('package_id', 1)])
+ 
+    def create(self, client_id, package_id, package_doc, admin_id):
+        """Create a new subscription when admin assigns a package."""
+        total = int(package_doc.get('sessions_count', 0))
+        weeks = int(package_doc.get('duration_weeks', 4))
+        spw = max(1, round(total / weeks)) if weeks else 1
+ 
+        doc = {
+            'client_id': str(client_id),
+            'package_id': str(package_id),
+            'package_title': package_doc.get('title', ''),
+            'total_sessions': total,
+            'sessions_per_week': spw,
+            'total_weeks': weeks,
+            'completed_sessions': 0,
+            'pending_sessions': total,
+            'status': 'active',
+            'enrolled_by': str(admin_id),
+            'enrolled_at': datetime.utcnow(),
+            'completed_at': None,
+            'updated_at': datetime.utcnow(),
+        }
+        result = self.collection.insert_one(doc)
+        doc['_id'] = str(result.inserted_id)
+        return serialize_doc(doc)
+ 
+    def get_active(self, client_id):
+        """Get active subscription for a client."""
+        doc = self.collection.find_one({
+            'client_id': str(client_id),
+            'status': 'active'
+        })
+        return serialize_doc(doc)
+ 
+    def deactivate_existing(self, client_id):
+        """Deactivate all active subscriptions for client (before assigning new one)."""
+        self.collection.update_many(
+            {'client_id': str(client_id), 'status': 'active'},
+            {'$set': {'status': 'inactive', 'ended_at': datetime.utcnow()}}
+        )
+ 
+    def increment_completed(self, client_id):
+        """Call when trainer marks attendance — increments completed, decrements pending."""
+        sub = self.collection.find_one({'client_id': str(client_id), 'status': 'active'})
+        if not sub:
+            return
+ 
+        new_completed = sub.get('completed_sessions', 0) + 1
+        new_pending = max(0, sub.get('pending_sessions', 0) - 1)
+ 
+        update = {
+            'completed_sessions': new_completed,
+            'pending_sessions': new_pending,
+            'updated_at': datetime.utcnow()
+        }
+ 
+        # Auto-complete subscription if all sessions done
+        if new_pending == 0:
+            update['status'] = 'completed'
+            update['completed_at'] = datetime.utcnow()
+ 
+        self.collection.update_one(
+            {'_id': sub['_id']},
+            {'$set': update}
+        )
+ 
+    def decrement_completed(self, client_id):
+        """Call when a completed session is deleted (reverse increment)."""
+        sub = self.collection.find_one({'client_id': str(client_id), 'status': {'$in': ['active', 'completed']}})
+        if not sub:
+            return
+        new_completed = max(0, sub.get('completed_sessions', 0) - 1)
+        new_pending = sub.get('pending_sessions', 0) + 1
+        self.collection.update_one(
+            {'_id': sub['_id']},
+            {'$set': {
+                'completed_sessions': new_completed,
+                'pending_sessions': new_pending,
+                'status': 'active',  # reopen if was completed
+                'completed_at': None,
+                'updated_at': datetime.utcnow()
+            }}
+        )
+ 
+    def get_all_active(self):
+        """Get all active subscriptions (for admin overview)."""
+        docs = list(self.collection.find({'status': 'active'}).sort('enrolled_at', -1))
+        return [serialize_doc(d) for d in docs]
+
+    def count(self, filter_dict=None):
+        return self.collection.count_documents(filter_dict or {})
+
+    def compute_progress(self, sub):
+        """
+        Given a serialized subscription dict, return deadline, weeks elapsed/remaining,
+        completion % and on-track flag.  All arithmetic is done server-side so the
+        frontend never has to guess.
+        """
+        if not sub:
+            return None
+
+        enrolled_at_raw = sub.get('enrolled_at')
+        if not enrolled_at_raw:
+            return None
+
+        if isinstance(enrolled_at_raw, datetime):
+            enrolled_at = enrolled_at_raw
+        else:
+            # ISO string from serialize_doc
+            try:
+                enrolled_at = datetime.fromisoformat(enrolled_at_raw.replace('Z', '+00:00'))
+            except (ValueError, AttributeError):
+                return None
+
+        # Strip tzinfo for naïve arithmetic
+        enrolled_at = enrolled_at.replace(tzinfo=None)
+
+        total_weeks = int(sub.get('total_weeks', 0))
+        total_sessions = int(sub.get('total_sessions', 0))
+        completed = int(sub.get('completed_sessions', 0))
+        spw = int(sub.get('sessions_per_week', 1))
+
+        now = datetime.utcnow()
+        deadline = enrolled_at + timedelta(weeks=total_weeks) if total_weeks else None
+
+        elapsed_days = max(0, (now - enrolled_at).days)
+        weeks_elapsed = elapsed_days // 7
+        weeks_remaining = max(0, total_weeks - weeks_elapsed) if total_weeks else 0
+
+        completion_pct = round(completed / total_sessions * 100) if total_sessions else 0
+        expected_done = min(total_sessions, weeks_elapsed * spw)
+        is_on_track = completed >= expected_done
+
+        return {
+            'deadline': deadline.isoformat() if deadline else None,
+            'weeks_elapsed': weeks_elapsed,
+            'weeks_remaining': weeks_remaining,
+            'completion_pct': completion_pct,
+            'is_on_track': is_on_track,
+            'expected_done': expected_done,
+        }
+ 
+ 
+# ─── PATCH QueryModel: add get_all_for_user ───────────────────────
+# Add this method inside your existing QueryModel class:
+ 
+class QueryModel_Patch:
+    """Patch methods to add to existing QueryModel"""
+ 
+    def get_all_for_user(self, user_id):
+        """Get all queries sent by a specific user (no pagination, for detail view)."""
+        docs = list(self.collection.find({'sender_id': str(user_id)}).sort('created_at', -1))
+        return [serialize_doc(d) for d in docs]
+ 
+ 
+# ─── PATCH ClientModel: get_all now includes subscription data ─────
+# Replace get_all in ClientModel with this version:
+ 
+class ClientModel_Patch:
+    """Patch for ClientModel.get_all to include subscription summary"""
+ 
+    def get_all_with_subscriptions(self, db, status=None, page=1, per_page=20):
+        """Get all clients, each enriched with subscription summary."""
+        collection = db['clients']
+        sub_collection = db['subscriptions']
+        assignment_collection = db['assignments']
+        trainer_collection = db['trainers']
+ 
+        query = {}
+        if status:
+            query['status'] = status
+ 
+        skip = (page - 1) * per_page
+        docs = list(collection.find(query).sort('created_at', -1).skip(skip).limit(per_page))
+        total = collection.count_documents(query)
+ 
+        result = []
+        for doc in docs:
+            c = serialize_doc(doc)
+ 
+            # Add subscription info
+            sub = sub_collection.find_one({'client_id': str(c['_id']), 'status': 'active'})
+            c['subscription'] = serialize_doc(sub) if sub else None
+ 
+            # Add trainer
+            asgn = assignment_collection.find_one({'client_id': str(c['_id']), 'status': 'active'})
+            if asgn:
+                trainer = trainer_collection.find_one({'_id': ObjectId(asgn['trainer_id'])})
+                c['assigned_trainer'] = {
+                    '_id': str(trainer['_id']),
+                    'name': trainer.get('name', ''),
+                    'specialization': trainer.get('specialization', '')
+                } if trainer else None
+            else:
+                c['assigned_trainer'] = None
+ 
+            result.append(c)
+ 
+        return {
+            'items': result,
+            'total': total,
+            'page': page,
+            'pages': (total + per_page - 1) // per_page
+        }
+ 
+ 
+# ─── PATCH SessionModel: get_client_sessions returns with attendance ──
+# Existing method is fine; ensure mark_attendance also sets status='completed':
+ 
+class SessionModel_Patch:
+    """Patch for SessionModel.mark_attendance"""
+ 
+    def mark_attendance_and_complete(self, session_id, trainer_id):
+        """Mark attendance AND set session to completed in one atomic update."""
+        return self.collection.update_one(
+            {
+                '_id': ObjectId(session_id),
+                'trainer_id': str(trainer_id),
+                'status': 'scheduled'
+            },
+            {'$set': {
+                'attendance_marked': True,
+                'status': 'completed',
+                'attended_at': datetime.utcnow(),
+                'completed_by': str(trainer_id),
+                'updated_at': datetime.utcnow()
+            }}
+        )

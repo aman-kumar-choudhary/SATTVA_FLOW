@@ -1,8 +1,8 @@
 <template>
   <div id="app">
 
-    <!-- ── NAVBAR ── -->
-    <nav class="navbar" :class="{ scrolled: isScrolled }">
+    <!-- ── NAVBAR ── (hidden on dashboard routes) -->
+    <nav v-if="!isDashboardRoute" class="navbar" :class="{ scrolled: isScrolled }">
       <div class="nav-container">
         <div class="nav-logo" @click="$router.push('/')">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 100" fill="none">
@@ -56,8 +56,8 @@
       </div>
     </nav>
 
-    <!-- ── MOBILE MENU ── -->
-    <div class="mobile-menu" :class="{ open: mobileMenuOpen }">
+    <!-- ── MOBILE MENU ── (hidden on dashboard routes) -->
+    <div v-if="!isDashboardRoute" class="mobile-menu" :class="{ open: mobileMenuOpen }">
       <div class="mobile-menu-inner">
         <div class="mobile-menu-links">
           <a href="#" @click.prevent="scrollTo('features'); closeMenu()">Platform</a>
@@ -82,8 +82,8 @@
     <!-- ── PAGE CONTENT ── -->
     <router-view />
 
-    <!-- ── FOOTER ── -->
-    <footer class="site-footer">
+    <!-- ── FOOTER ── (hidden on dashboard routes) -->
+    <footer v-if="!isDashboardRoute" class="site-footer">
       <div class="footer-inner">
         <div class="footer-grid">
           <!-- Brand -->
@@ -162,8 +162,8 @@
       </div>
     </footer>
 
-    <!-- WhatsApp Float -->
-    <a href="https://wa.me/" class="whatsapp-float" target="_blank" title="Chat on WhatsApp">💬</a>
+    <!-- WhatsApp Float (hidden on dashboard routes) -->
+    <a v-if="!isDashboardRoute" href="https://wa.me/" class="whatsapp-float" target="_blank" title="Chat on WhatsApp">💬</a>
 
   </div>
 </template>
@@ -178,6 +178,10 @@ export default {
     }
   },
   computed: {
+    isDashboardRoute() {
+      const dashboardPaths = ['/admin', '/trainer', '/client']
+      return dashboardPaths.some(p => this.$route.path.startsWith(p))
+    },
     isAuthenticated() {
       return !!localStorage.getItem('token')
     },

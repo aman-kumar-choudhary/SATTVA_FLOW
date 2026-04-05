@@ -10,7 +10,8 @@ from config import Config
 from models import (
     UserModel, ClientModel, TrainerModel, AssignmentModel,
     SessionModel, PlanModel, PackageModel, MessageModel,
-    QueryModel, ReviewModel, NotificationModel, ActivityLogModel
+    QueryModel, ReviewModel, NotificationModel, ActivityLogModel,
+    SubscriptionModel
 )
 from notification_service import NotificationService
 from auth import token_required, admin_required, trainer_required, client_required, generate_jwt
@@ -42,6 +43,7 @@ query_model = QueryModel(db)
 review_model = ReviewModel(db)
 notification_model = NotificationModel(db)
 activity_log_model = ActivityLogModel(db)
+subscription_model = SubscriptionModel(db)
 
 # Ensure admin exists on startup
 def ensure_admin():
@@ -244,17 +246,33 @@ def update_profile():
     user_id = request.user['user_id']
     role = request.user['role']
     data = request.get_json() or {}
-    
+
+    # Allowed fields by role
+    allowed_base = {'name', 'phone'}
+    allowed_client = allowed_base | {
+        'city', 'age', 'date_of_birth', 'gender',
+        'health_conditions', 'yoga_experience', 'health_goals',
+        'expectations', 'emergency_contact'
+    }
+    allowed_trainer = allowed_base | {
+        'specialization', 'experience', 'certifications', 'bio', 'city'
+    }
+
     if role == 'admin':
-        user_model.update(user_id, data)
+        filtered = {k: v for k, v in data.items() if k in allowed_base}
+        user_model.update(user_id, filtered)
     elif role == 'client':
-        client_model.update(user_id, data)
+        filtered = {k: v for k, v in data.items() if k in allowed_client}
+        client_model.update(user_id, filtered)
     elif role == 'trainer':
-        trainer_model.update(user_id, data)
-    
+        filtered = {k: v for k, v in data.items() if k in allowed_trainer}
+        trainer_model.update(user_id, filtered)
+
     log_activity(user_id, role, 'profile_update', 'Updated profile')
-    
-    return jsonify({'message': 'Profile updated successfully'}), 200
+
+    # Return updated user
+    user, _ = get_user_by_id(user_id)
+    return jsonify({'message': 'Profile updated successfully', 'user': user}), 200
 
 # ==================== ADMIN ROUTES ====================
 
@@ -448,6 +466,412 @@ def admin_activate_client(client_id):
     
     return jsonify({'message': 'Client activated'}), 200
 
+
+@app.route('/api/admin/clients/<client_id>/detail', methods=['GET'])
+@token_required
+@admin_required
+def admin_client_detail(client_id):
+    """Get complete client detail: info, trainer, sessions, queries, subscription, progress"""
+    client = client_model.find_by_id(client_id)
+    if not client:
+        return jsonify({'error': 'Client not found'}), 404
+ 
+    # Trainer
+    assignment = assignment_model.get_client_trainer(client_id)
+    trainer = None
+    if assignment:
+        trainer = trainer_model.find_by_id(assignment['trainer_id'])
+ 
+    # Sessions (all, sorted by scheduled_at desc)
+    sessions = session_model.get_client_sessions(client_id)
+ 
+    # Queries
+    queries_data = query_model.get_all_for_user(client_id)
+
+    # Subscription / package progress
+    subscription = subscription_model.get_active(client_id)
+    progress = subscription_model.compute_progress(subscription)
+
+    return jsonify({
+        'client': client,
+        'trainer': trainer,
+        'sessions': sessions,
+        'queries': queries_data,
+        'subscription': subscription,
+        'progress': progress,
+    }), 200
+ 
+@app.route('/api/admin/clients/<client_id>/assign-trainer', methods=['POST'])
+@token_required
+@admin_required
+def admin_assign_trainer_shorthand(client_id):
+    """Assign or reassign a trainer to a client from the client detail panel."""
+    data = request.get_json() or {}
+    trainer_id = data.get('trainer_id')
+    if not trainer_id:
+        return jsonify({'error': 'trainer_id required'}), 400
+
+    client = client_model.find_by_id(client_id)
+    trainer = trainer_model.find_by_id(trainer_id)
+    if not client or not trainer:
+        return jsonify({'error': 'Client or trainer not found'}), 404
+    if trainer.get('status') != 'active':
+        return jsonify({'error': 'Trainer is not active'}), 400
+
+    # assign() already deactivates any previous assignment first
+    assignment = assignment_model.assign(trainer_id, client_id, request.user['user_id'])
+
+    send_notification_with_channels(
+        trainer,
+        "New Client Assigned",
+        f"You have been assigned client: {client['name']}.",
+        'assignment',
+        f"/trainer/clients/{client_id}"
+    )
+    send_notification_with_channels(
+        client,
+        "Trainer Assigned",
+        f"Your trainer is now {trainer['name']} ({trainer.get('specialization', '')}).",
+        'assignment',
+        "/client/trainer"
+    )
+    log_activity(
+        request.user['user_id'], 'admin', 'assign_trainer',
+        f"Assigned {client['name']} → {trainer['name']}"
+    )
+    return jsonify({'message': 'Trainer assigned', 'assignment': assignment}), 200
+
+
+@app.route('/api/admin/clients/<client_id>/unblock', methods=['PUT'])
+@token_required
+@admin_required
+def admin_unblock_client(client_id):
+    """Unblock client account"""
+    client = client_model.find_by_id(client_id)
+    if not client:
+        return jsonify({'error': 'Client not found'}), 404
+ 
+    client_model.activate(client_id)
+ 
+    send_notification_with_channels(
+        client,
+        "Account Unblocked",
+        "Your SattvaFlow account has been unblocked. You can now log in.",
+        'success',
+        "/client/dashboard"
+    )
+    log_activity(request.user['user_id'], 'admin', 'unblock_client', f"Unblocked client {client['name']}")
+    return jsonify({'message': 'Client unblocked'}), 200
+
+@app.route('/api/admin/clients/<client_id>', methods=['DELETE'])
+@token_required
+@admin_required
+def admin_delete_client(client_id):
+    """Permanently remove client and all their data"""
+    client = client_model.find_by_id(client_id)
+    if not client:
+        return jsonify({'error': 'Client not found'}), 404
+ 
+    # Remove assignments
+    assignment_model.collection.delete_many({'client_id': client_id})
+    # Remove sessions
+    session_model.collection.delete_many({'client_id': client_id})
+    # Remove subscriptions
+    subscription_model.collection.delete_many({'client_id': client_id})
+    # Remove queries
+    query_model.collection.delete_many({'sender_id': client_id})
+    # Remove reviews
+    review_model.collection.delete_many({'client_id': client_id})
+    # Remove notifications
+    notification_model.collection.delete_many({'user_id': client_id})
+    # Remove client
+    client_model.delete(client_id)
+ 
+    log_activity(request.user['user_id'], 'admin', 'delete_client', f"Deleted client {client['name']}")
+    return jsonify({'message': 'Client removed permanently'}), 200
+@app.route('/api/admin/trainers/<trainer_id>', methods=['DELETE'])
+@token_required
+@admin_required
+def admin_delete_trainer(trainer_id):
+    """Permanently remove trainer"""
+    trainer = trainer_model.find_by_id(trainer_id)
+    if not trainer:
+        return jsonify({'error': 'Trainer not found'}), 404
+ 
+    # Reassign clients (remove assignments)
+    assignment_model.collection.update_many(
+        {'trainer_id': trainer_id, 'status': 'active'},
+        {'$set': {'status': 'removed', 'ended_at': datetime.utcnow()}}
+    )
+    # Remove sessions
+    session_model.collection.delete_many({'trainer_id': trainer_id})
+    # Remove reviews
+    review_model.collection.delete_many({'trainer_id': trainer_id})
+    # Remove trainer
+    trainer_model.delete(trainer_id)
+ 
+    log_activity(request.user['user_id'], 'admin', 'delete_trainer', f"Deleted trainer {trainer['name']}")
+    return jsonify({'message': 'Trainer removed permanently'}), 200
+ 
+ 
+# ─── PATCH 7: DELETE SESSION ───
+ 
+
+ 
+ 
+# ─── PATCH 8: ASSIGN PACKAGE TO CLIENT ───
+ 
+@app.route('/api/admin/clients/<client_id>/assign-package', methods=['POST'])
+@token_required
+@admin_required
+def admin_assign_package(client_id):
+    """Assign a package to a client (creates subscription)"""
+    data = request.get_json() or {}
+    package_id = data.get('package_id')
+ 
+    if not package_id:
+        return jsonify({'error': 'package_id required'}), 400
+ 
+    client = client_model.find_by_id(client_id)
+    package = package_model.find_by_id(package_id)
+ 
+    if not client:
+        return jsonify({'error': 'Client not found'}), 404
+    if not package:
+        return jsonify({'error': 'Package not found'}), 404
+ 
+    # Deactivate existing subscription
+    subscription_model.deactivate_existing(client_id)
+ 
+    # Create new subscription
+    sub = subscription_model.create(client_id, package_id, package, request.user['user_id'])
+ 
+    # Notify client
+    send_notification_with_channels(
+        client,
+        f"Package Assigned: {package['title']}",
+        f"You have been enrolled in the '{package['title']}' package — {package['sessions_count']} sessions over {package['duration_weeks']} weeks.",
+        'success',
+        "/client/dashboard"
+    )
+ 
+    log_activity(request.user['user_id'], 'admin', 'assign_package', f"Assigned package '{package['title']}' to {client['name']}")
+    return jsonify({'message': 'Package assigned', 'subscription': sub}), 201
+ 
+ 
+# ─── PATCH 9: LIST ALL SUBSCRIPTIONS ───
+ 
+@app.route('/api/admin/subscriptions', methods=['GET'])
+@token_required
+@admin_required
+def admin_get_subscriptions():
+    """Get all active subscriptions with client and package details"""
+    subs = subscription_model.get_all_active()
+ 
+    for sub in subs:
+        client = client_model.find_by_id(sub['client_id'])
+        sub['client_name'] = client['name'] if client else '—'
+ 
+    return jsonify({'items': subs}), 200
+ 
+ 
+# ─── PATCH 10: SESSION GET WITH STATUS FILTER ───
+# Update existing admin_get_sessions to support status filter:
+# Add:  if status: query['status'] = status
+# In the find() call.
+ 
+@app.route('/api/admin/sessions/filtered', methods=['GET'])
+@token_required
+@admin_required
+def admin_get_sessions_filtered():
+    """Get sessions with optional status filter"""
+    status = request.args.get('status')
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    client_id = request.args.get('client_id')
+ 
+    query = {}
+    if status:
+        query['status'] = status
+    if client_id:
+        query['client_id'] = client_id
+ 
+    skip = (page - 1) * per_page
+    raw_sessions = list(session_model.collection.find(query).sort('scheduled_at', -1).skip(skip).limit(per_page))
+    total = session_model.collection.count_documents(query)
+ 
+    from models import serialize_doc
+    result = []
+    for s in raw_sessions:
+        s = serialize_doc(s)
+        s['client'] = client_model.find_by_id(s['client_id'])
+        s['trainer'] = trainer_model.find_by_id(s['trainer_id'])
+        result.append(s)
+ 
+    return jsonify({
+        'items': result,
+        'total': total,
+        'page': page,
+        'pages': (total + per_page - 1) // per_page
+    }), 200
+ 
+ 
+# ─── PATCH 11: FIXED ATTENDANCE MARKING ───
+# Replace the existing trainer mark_attendance route with this:
+ 
+@app.route('/api/trainer/sessions/<session_id>/attendance', methods=['PUT'])
+@token_required
+@trainer_required
+def trainer_mark_attendance(session_id):
+    """Mark session attendance - updates session status AND increments subscription count"""
+    trainer_id = request.user['user_id']
+ 
+    session = session_model.find_by_id(session_id)
+    if not session:
+        return jsonify({'error': 'Session not found'}), 404
+ 
+    if session['trainer_id'] != str(trainer_id):
+        return jsonify({'error': 'Not your session'}), 403
+ 
+    if session.get('attendance_marked'):
+        return jsonify({'error': 'Attendance already marked'}), 400
+ 
+    if session['status'] != 'scheduled':
+        return jsonify({'error': 'Session is not in scheduled state'}), 400
+ 
+    # Mark attendance on the session
+    session_model.mark_attendance(session_id)
+    # Update session status to completed
+    session_model.update_status(session_id, 'completed', trainer_id)
+ 
+    # Update subscription completed count
+    subscription = subscription_model.get_active(session['client_id'])
+    if subscription:
+        subscription_model.increment_completed(session['client_id'])
+ 
+    # Notify client
+    client = client_model.find_by_id(session['client_id'])
+    if client:
+        # Get updated subscription for progress
+        updated_sub = subscription_model.get_active(session['client_id'])
+        pending = updated_sub['pending_sessions'] if updated_sub else '?'
+        completed = updated_sub['completed_sessions'] if updated_sub else '?'
+        total = updated_sub['total_sessions'] if updated_sub else '?'
+ 
+        send_notification_with_channels(
+            client,
+            f"Session Completed: {session['title']}",
+            f"Your session '{session['title']}' has been marked complete. Progress: {completed}/{total} sessions done, {pending} remaining.",
+            'success',
+            "/client/sessions"
+        )
+ 
+    # Notify admin
+    notify_admin(
+        f"Session Attended: {session['title']}",
+        f"Trainer marked attendance for session with client {client['name'] if client else ''}.",
+        'session'
+    )
+ 
+    log_activity(trainer_id, 'trainer', 'mark_attendance', f"Marked attendance for session '{session['title']}'")
+ 
+    return jsonify({'message': 'Attendance marked, session completed'}), 200
+ 
+ 
+# ─── PATCH 12: PACKAGES WITH FILTER (update existing admin_get_packages) ───
+ 
+@app.route('/api/admin/packages/all', methods=['GET'])
+@token_required
+@admin_required
+def admin_get_all_packages():
+    """Get all packages (active + inactive) for admin"""
+    data = package_model.get_all()
+    # Add enrollment counts
+    for pkg in data.get('items', data if isinstance(data, list) else []):
+        pkg['enrolled_count'] = subscription_model.count({'package_id': pkg['_id'], 'status': 'active'})
+    return jsonify(data), 200
+ 
+ 
+@app.route('/api/admin/packages/<package_id>', methods=['DELETE'])
+@token_required
+@admin_required
+def admin_delete_package(package_id):
+    """Delete a package (only if no active subscriptions)"""
+    count = subscription_model.count({'package_id': package_id, 'status': 'active'})
+    if count > 0:
+        return jsonify({'error': f'Cannot delete: {count} active subscriptions exist'}), 400
+ 
+    package_model.delete(package_id)
+    return jsonify({'message': 'Package deleted'}), 200
+ 
+ 
+# ─── PATCH 13: CLIENT STATS FOR TRAINER DASHBOARD ───
+ 
+@app.route('/api/trainer/clients/<client_id>/progress', methods=['GET'])
+@token_required
+@trainer_required
+def trainer_client_progress(client_id):
+    """Get client's session progress for trainer view"""
+    trainer_id = request.user['user_id']
+ 
+    # Verify this trainer is assigned to this client
+    assignment = assignment_model.get_client_trainer(client_id)
+    if not assignment or assignment['trainer_id'] != str(trainer_id):
+        return jsonify({'error': 'Not your client'}), 403
+ 
+    subscription = subscription_model.get_active(client_id)
+    sessions = session_model.get_client_sessions(client_id)
+ 
+    return jsonify({
+        'subscription': subscription,
+        'sessions': sessions
+    }), 200
+ 
+ 
+# ─── PATCH 14: CLIENT SELF-VIEW PROGRESS ───
+ 
+@app.route('/api/client/progress', methods=['GET'])
+@token_required
+@client_required
+def client_get_progress():
+    """Client's own session/package progress"""
+    client_id = request.user['user_id']
+ 
+    subscription = subscription_model.get_active(client_id)
+    sessions = session_model.get_client_sessions(client_id)
+    upcoming = session_model.get_upcoming_sessions(client_id, 'client', 5)
+ 
+    return jsonify({
+        'subscription': subscription,
+        'sessions': sessions,
+        'upcoming': upcoming,
+        'total_completed': len([s for s in sessions if s.get('attendance_marked')]),
+        'total_scheduled': len([s for s in sessions if s['status'] == 'scheduled'])
+    }), 200
+
+
+
+@app.route('/api/admin/trainers/<trainer_id>/unblock', methods=['PUT'])
+@token_required
+@admin_required
+def admin_unblock_trainer(trainer_id):
+    """Unblock trainer account"""
+    trainer = trainer_model.find_by_id(trainer_id)
+    if not trainer:
+        return jsonify({'error': 'Trainer not found'}), 404
+ 
+    trainer_model.approve(trainer_id, request.user['user_id'])
+ 
+    send_notification_with_channels(
+        trainer,
+        "Account Unblocked",
+        "Your SattvaFlow trainer account has been unblocked.",
+        'success',
+        "/trainer/dashboard"
+    )
+    return jsonify({'message': 'Trainer unblocked'}), 200
+ 
+
 @app.route('/api/admin/clients/<client_id>/block', methods=['PUT'])
 @token_required
 @admin_required
@@ -604,21 +1028,30 @@ def admin_reassign():
 @token_required
 @admin_required
 def admin_get_sessions():
-    """Get all sessions"""
+    """Get all sessions with optional status filter"""
+    from models import serialize_doc
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', Config.ITEMS_PER_PAGE))
-    
+    status = request.args.get('status')  # FIX: support status filter
+
+    query = {}
+    if status:
+        query['status'] = status
+
     skip = (page - 1) * per_page
-    sessions = list(session_model.collection.find().sort('scheduled_at', -1).skip(skip).limit(per_page))
-    total = session_model.count()
-    
-    # Add client and trainer details
-    for session in sessions:
-        session['client'] = client_model.find_by_id(session['client_id'])
-        session['trainer'] = trainer_model.find_by_id(session['trainer_id'])
-    
+    # FIX: call serialize_doc on each raw MongoDB document so ObjectId/_id/datetime are JSON-safe
+    raw_sessions = list(session_model.collection.find(query).sort('scheduled_at', -1).skip(skip).limit(per_page))
+    total = session_model.collection.count_documents(query)
+
+    result = []
+    for s in raw_sessions:
+        s = serialize_doc(s)  # FIX: serialize before adding nested objects
+        s['client'] = client_model.find_by_id(s.get('client_id'))
+        s['trainer'] = trainer_model.find_by_id(s.get('trainer_id'))
+        result.append(s)
+
     return jsonify({
-        'items': [session for session in sessions],
+        'items': result,
         'total': total,
         'page': page,
         'pages': (total + per_page - 1) // per_page
@@ -703,32 +1136,39 @@ def admin_update_session(session_id):
 @token_required
 @admin_required
 def admin_delete_session(session_id):
-    """Delete/cancel session"""
+    """Delete/cancel session — notifies client & trainer, decrements subscription if completed"""
     session = session_model.find_by_id(session_id)
-    if session:
-        client = client_model.find_by_id(session['client_id'])
-        trainer = trainer_model.find_by_id(session['trainer_id'])
-        
-        if client:
-            send_notification_with_channels(
-                client,
-                "Session Cancelled",
-                f"Your session '{session['title']}' has been cancelled.",
-                'error',
-                "/client/sessions"
-            )
-        
-        if trainer:
-            send_notification_with_channels(
-                trainer,
-                "Session Cancelled",
-                f"Session '{session['title']}' with {client['name'] if client else 'client'} has been cancelled.",
-                'error',
-                "/trainer/sessions"
-            )
-    
+    if not session:
+        return jsonify({'error': 'Session not found'}), 404
+
+    client = client_model.find_by_id(session['client_id'])
+    trainer = trainer_model.find_by_id(session['trainer_id'])
+
+    # Decrement subscription count if session was already completed
+    if session.get('status') == 'completed' and session.get('attendance_marked'):
+        subscription_model.decrement_completed(session['client_id'])
+
+    # Notify client
+    if client:
+        send_notification_with_channels(
+            client,
+            "Session Cancelled",
+            f"Your session '{session['title']}' has been cancelled.",
+            'error',
+            "/client/sessions"
+        )
+
+    # Notify trainer
+    if trainer:
+        send_notification_with_channels(
+            trainer,
+            "Session Cancelled",
+            f"Session '{session['title']}' with {client['name'] if client else 'client'} has been cancelled.",
+            'error',
+            "/trainer/sessions"
+        )
+
     session_model.delete(session_id)
-    
     return jsonify({'message': 'Session deleted'}), 200
 
 @app.route('/api/admin/packages', methods=['GET'])
@@ -754,10 +1194,19 @@ def admin_get_packages():
 def admin_create_package():
     """Create a new package/offer"""
     data = request.get_json() or {}
-    
+
     if not data.get('title'):
         return jsonify({'error': 'Package title required'}), 400
-    
+
+    duration_weeks = int(data.get('duration_weeks', 0))
+    sessions_per_week = int(data.get('sessions_per_week', 0))
+    sessions_count = int(data.get('sessions_count', 0))
+
+    if duration_weeks < 1:
+        return jsonify({'error': 'duration_weeks must be ≥ 1'}), 400
+    if sessions_per_week < 1 and sessions_count < 1:
+        return jsonify({'error': 'Provide sessions_per_week or sessions_count'}), 400
+
     package = package_model.create(data, request.user['user_id'])
     
     # Notify all active clients and trainers about new package
@@ -786,10 +1235,20 @@ def admin_create_package():
 @token_required
 @admin_required
 def admin_update_package(package_id):
-    """Update package"""
+    """Update package — recomputes sessions_count when sessions_per_week/duration_weeks change"""
     data = request.get_json() or {}
+
+    # Recompute derived fields if both driving fields are present
+    spw = data.get('sessions_per_week')
+    dw  = data.get('duration_weeks')
+    if spw is not None and dw is not None:
+        data['sessions_count'] = int(spw) * int(dw)
+    elif spw is not None:
+        pkg = package_model.find_by_id(package_id)
+        if pkg:
+            data['sessions_count'] = int(spw) * int(pkg.get('duration_weeks', 1))
+
     package_model.update(package_id, data)
-    
     return jsonify({'message': 'Package updated'}), 200
 
 @app.route('/api/admin/packages/<package_id>/toggle', methods=['PUT'])
@@ -801,14 +1260,6 @@ def admin_toggle_package(package_id):
     
     return jsonify({'message': 'Package status toggled'}), 200
 
-@app.route('/api/admin/packages/<package_id>', methods=['DELETE'])
-@token_required
-@admin_required
-def admin_delete_package(package_id):
-    """Delete package"""
-    package_model.delete(package_id)
-    
-    return jsonify({'message': 'Package deleted'}), 200
 
 @app.route('/api/admin/queries', methods=['GET'])
 @token_required
@@ -828,7 +1279,7 @@ def admin_get_queries():
     
     return jsonify(result), 200
 
-@app.route('/api/admin/queries/<query_id>/respond', methods=['POST'])
+@app.route('/api/admin/queries/<query_id>/respond', methods=['POST', 'PUT'])
 @token_required
 @admin_required
 def admin_respond_query(query_id):
@@ -1215,29 +1666,7 @@ def trainer_get_sessions():
     
     return jsonify(sessions), 200
 
-@app.route('/api/trainer/sessions/<session_id>/attendance', methods=['PUT'])
-@token_required
-@trainer_required
-def trainer_mark_attendance(session_id):
-    """Mark session attendance"""
-    session = session_model.find_by_id(session_id)
-    if not session:
-        return jsonify({'error': 'Session not found'}), 404
-    
-    # Verify trainer owns this session
-    if session['trainer_id'] != request.user['user_id']:
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    session_model.mark_attendance(session_id)
-    
-    # Update assignment sessions_completed
-    assignment = assignment_model.get_client_trainer(session['client_id'])
-    if assignment:
-        assignment_model.update(assignment['_id'], {
-            'sessions_completed': assignment.get('sessions_completed', 0) + 1
-        })
-    
-    return jsonify({'message': 'Attendance marked'}), 200
+
 
 @app.route('/api/trainer/reviews', methods=['GET'])
 @token_required
@@ -1512,8 +1941,8 @@ def client_reviews():
     client_id = request.user['user_id']
     
     if request.method == 'GET':
-        reviews = list(review_model.collection.find({'client_id': client_id}))
-        return jsonify([review for review in reviews]), 200
+        reviews = review_model.get_client_reviews(client_id)
+        return jsonify(reviews), 200
     
     # POST - Create review
     data = request.get_json() or {}
