@@ -871,7 +871,8 @@ import { defineComponent, ref, computed, onMounted, onUnmounted, reactive } from
 
 const API = (path, opts = {}) => {
   const token = localStorage.getItem('token')
-  return fetch(`/api${path}`, {
+  const BASE = import.meta.env.VITE_API_URL || 'https://sattva-flow-nv6n.onrender.com'
+  return fetch(`${BASE}/api${path}`, {   // ← Use env var
     ...opts,
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', ...(opts.headers || {}) }
   }).then(async r => {
