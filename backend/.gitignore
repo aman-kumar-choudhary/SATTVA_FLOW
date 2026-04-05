@@ -6,5 +6,5 @@ tmp/
 temp/
 *.tmp
 # *.json
-# .env
+.env
 secrets/
