@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 # Initialize Flask
 app = Flask(__name__)
 app.config.from_object(Config)
-CORS(app, origins=[Config.FRONTEND_URL], supports_credentials=True)
+allowed_origins = [o.strip() for o in os.getenv('FRONTEND_URL', 'http://localhost:5173').split(',')]
+CORS(app, origins=allowed_origins, supports_credentials=True)
 
 # Database connection
 mongo_client = MongoClient(Config.MONGODB_URI)
