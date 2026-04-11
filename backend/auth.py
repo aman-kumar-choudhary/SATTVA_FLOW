@@ -1,6 +1,6 @@
 # auth.py
 from functools import wraps
-from flask import request, jsonify
+from flask import request, jsonify, g
 import jwt
 from datetime import datetime, timedelta
 from config import Config
@@ -29,16 +29,19 @@ def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         auth_header = request.headers.get('Authorization', '')
-        
+
         if not auth_header:
             return jsonify({'error': 'Authorization header missing'}), 401
-        
+
         token = auth_header[7:] if auth_header.startswith('Bearer ') else auth_header
-        
+
         payload = decode_jwt(token)
         if not payload:
             return jsonify({'error': 'Invalid or expired token'}), 401
-        
+
+        # Store on flask.g — the correct per-request context store in Flask.
+        # Also mirror to request.user for any existing code that reads it.
+        g.user = payload
         request.user = payload
         return f(*args, **kwargs)
     return decorated
@@ -48,7 +51,9 @@ def role_required(*roles):
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
-            user_role = getattr(request, 'user', {}).get('role')
+            # Read from g.user (set by token_required); fall back to request.user
+            user_data = getattr(g, 'user', None) or getattr(request, 'user', {})
+            user_role = user_data.get('role') if isinstance(user_data, dict) else None
             if user_role not in roles:
                 return jsonify({'error': 'Insufficient permissions'}), 403
             return f(*args, **kwargs)

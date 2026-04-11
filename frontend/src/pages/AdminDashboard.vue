@@ -97,6 +97,10 @@
               <div class="user-avatar">A</div>
               <span class="user-name">Admin</span>
             </div>
+            <button class="logout-btn" @click="logout" title="Logout">
+              <span class="logout-icon">⏻</span>
+              <span class="logout-label">Logout</span>
+            </button>
           </div>
         </div>
         <div v-if="loading" class="loading-bar-wrap">
@@ -368,23 +372,62 @@
           </div>
 
           <!-- Info Tab -->
-          <div v-if="clientDetailTab === 'info'" class="card">
-            <div class="info-grid">
-              <div v-for="field in clientInfoFields(selectedClient, selectedClientDetail)" :key="field.label">
-                <label class="field-label">{{ field.label }}</label>
-                <p class="field-value" v-html="field.value"></p>
+          <div v-if="clientDetailTab === 'info'">
+            <!-- ── Client Personal Details ── -->
+            <div class="card mb-4">
+              <h4 class="card-title mb-3">👤 Client Details</h4>
+              <div class="info-grid">
+                <div v-for="field in clientInfoFields(selectedClient, selectedClientDetail)" :key="field.label">
+                  <label class="field-label">{{ field.label }}</label>
+                  <p class="field-value" v-html="field.value"></p>
+                </div>
               </div>
             </div>
-            <div v-if="activeTrainers.length" class="divider-top mt-4 pt-4">
-              <h4 class="font-medium mb-3">Assign / Reassign Trainer</h4>
-              <div class="row-gap">
-                <select v-model="trainerToAssign" class="form-input flex-1">
-                  <option value="">— Select Trainer —</option>
-                  <option v-for="t in activeTrainers" :key="t._id" :value="t._id">{{ t.name }} · {{ t.specialization }}</option>
-                </select>
-                <button class="btn-approve" :disabled="!trainerToAssign || actionLoading" @click="assignTrainer">
-                  {{ selectedClientDetail.trainer ? 'Reassign' : 'Assign' }}
-                </button>
+
+            <!-- ── Assigned Trainer Details ── -->
+            <div class="card mb-4">
+              <h4 class="card-title mb-3">🧘 Assigned Trainer</h4>
+              <div v-if="selectedClientDetail.trainer" class="info-grid">
+                <div>
+                  <label class="field-label">Name</label>
+                  <p class="field-value">{{ selectedClientDetail.trainer.name || '—' }}</p>
+                </div>
+                <div>
+                  <label class="field-label">Email</label>
+                  <p class="field-value">{{ selectedClientDetail.trainer.email || '—' }}</p>
+                </div>
+                <div>
+                  <label class="field-label">Phone</label>
+                  <p class="field-value">{{ selectedClientDetail.trainer.phone || '—' }}</p>
+                </div>
+                <div>
+                  <label class="field-label">Specialization</label>
+                  <p class="field-value">{{ selectedClientDetail.trainer.specialization || '—' }}</p>
+                </div>
+                <div>
+                  <label class="field-label">Experience</label>
+                  <p class="field-value">{{ selectedClientDetail.trainer.experience_years ? selectedClientDetail.trainer.experience_years + ' yrs' : '—' }}</p>
+                </div>
+                <div>
+                  <label class="field-label">Trainer Status</label>
+                  <p class="field-value"><span :class="statusPill(selectedClientDetail.trainer.status)">{{ selectedClientDetail.trainer.status }}</span></p>
+                </div>
+              </div>
+              <div v-else class="info-banner">
+                <span>ℹ</span>
+                <span>No trainer assigned yet.</span>
+              </div>
+              <div v-if="activeTrainers.length" class="divider-top mt-4 pt-4">
+                <h4 class="font-medium mb-3">{{ selectedClientDetail.trainer ? 'Reassign Trainer' : 'Assign Trainer' }}</h4>
+                <div class="row-gap">
+                  <select v-model="trainerToAssign" class="form-input flex-1">
+                    <option value="">— Select Trainer —</option>
+                    <option v-for="t in activeTrainers" :key="t._id" :value="t._id">{{ t.name }} · {{ t.specialization }}</option>
+                  </select>
+                  <button class="btn-approve" :disabled="!trainerToAssign || actionLoading" @click="assignTrainer">
+                    {{ selectedClientDetail.trainer ? 'Reassign' : 'Assign' }}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -492,13 +535,17 @@
           </div>
 
           <div v-if="trainerDetailTab === 'info'" class="card">
+            <h4 class="card-title mb-3">🧘 Trainer Profile</h4>
             <div class="info-grid">
               <div><label class="field-label">Full Name</label><p class="field-value">{{ selectedTrainer.name || '—' }}</p></div>
               <div><label class="field-label">Email</label><p class="field-value">{{ selectedTrainer.email || '—' }}</p></div>
+              <div><label class="field-label">Phone</label><p class="field-value">{{ selectedTrainer.phone || '—' }}</p></div>
               <div><label class="field-label">Specialization</label><p class="field-value">{{ selectedTrainer.specialization || '—' }}</p></div>
               <div><label class="field-label">Experience</label><p class="field-value">{{ selectedTrainer.experience_years ? selectedTrainer.experience_years + ' yrs' : '—' }}</p></div>
-              <div><label class="field-label">Status</label><p class="field-value"><span :class="statusPill(selectedTrainer.status)">{{ selectedTrainer.status }}</span></p></div>
-              <div><label class="field-label">Registered</label><p class="field-value">{{ formatDate(selectedTrainer.created_at) }}</p></div>
+              <div><label class="field-label">Certification</label><p class="field-value">{{ selectedTrainer.certification || '—' }}</p></div>
+              <div><label class="field-label">Bio</label><p class="field-value">{{ selectedTrainer.bio || '—' }}</p></div>
+              <div><label class="field-label">Account Status</label><p class="field-value"><span :class="statusPill(selectedTrainer.status)">{{ selectedTrainer.status }}</span></p></div>
+              <div><label class="field-label">Joined On</label><p class="field-value">{{ formatDate(selectedTrainer.created_at) }}</p></div>
             </div>
           </div>
 
@@ -525,13 +572,16 @@
             <div v-if="!selectedTrainerDetail.sessions?.length" class="empty-state">No sessions yet.</div>
             <div v-else class="table-wrap">
               <table class="data-table">
-                <thead><tr><th>Title</th><th>Client</th><th>Date</th><th>Status</th></tr></thead>
+                <thead><tr><th>#</th><th>Title</th><th>Client</th><th>Date &amp; Time</th><th>Duration</th><th>Status</th><th>Attended</th></tr></thead>
                 <tbody>
-                  <tr v-for="s in selectedTrainerDetail.sessions" :key="s._id">
+                  <tr v-for="(s, idx) in selectedTrainerDetail.sessions" :key="s._id">
+                    <td class="text-muted">{{ idx + 1 }}</td>
                     <td class="font-medium">{{ s.title }}</td>
                     <td>{{ s.client?.name || '—' }}</td>
                     <td>{{ formatDateTime(s.scheduled_at) }}</td>
+                    <td>{{ s.duration_minutes || 60 }}m</td>
                     <td><span :class="statusPill(s.status)">{{ s.status }}</span></td>
+                    <td><span v-if="s.attendance_marked" class="badge-yes">✓ Yes</span><span v-else class="badge-no">—</span></td>
                   </tr>
                 </tbody>
               </table>
@@ -686,6 +736,41 @@
             </table>
           </div>
         </div>
+
+        <div v-if="packageInterests.length" class="card mt-6">
+          <div class="card-header">
+            <h3 class="card-title">🔔 Package Interest Requests</h3>
+            <span class="badge-count">{{ packageInterests.length }}</span>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Client</th>
+                  <th>Email</th>
+                  <th>Package</th>
+                  <th>Assigned Trainer</th>
+                  <th>Trainer Specialization</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, i) in packageInterests" :key="i">
+                  <td class="font-medium">{{ row.client_name }}</td>
+                  <td class="text-muted">{{ row.client_email }}</td>
+                  <td>{{ row.package_title }}</td>
+                  <td>
+                    <span v-if="row.trainer" class="badge-yes">{{ row.trainer.name }}</span>
+                    <span v-else class="badge-no">Not assigned</span>
+                  </td>
+                  <td class="text-muted">{{ row.trainer?.specialization || '—' }}</td>
+                  <td>{{ formatDate(row.expressed_at) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </section>
 
       <!-- ══════════════ QUERIES ══════════════ -->
@@ -868,6 +953,7 @@
 
 <script>
 import { defineComponent, ref, computed, onMounted, onUnmounted, reactive } from 'vue'
+import { useRouter } from 'vue-router'
 
 const API = (path, opts = {}) => {
   const token = localStorage.getItem('token')
@@ -885,6 +971,9 @@ const API = (path, opts = {}) => {
 export default defineComponent({
   name: 'AdminDashboard',
   setup() {
+    const router = useRouter()
+    const logout = () => { localStorage.clear(); router.push('/') }
+
     const activeSection = ref('overview')
     const sidebarCollapsed = ref(false)
     const mobileSidebarOpen = ref(false)
@@ -933,7 +1022,7 @@ export default defineComponent({
     const queries = ref([])
     const queryFilter = ref('all')
     const reviews = ref([])
-
+    const packageInterests = ref([])
     const confirmModal = reactive({ show: false, type: '', id: '', name: '' })
 
     const navItems = [
@@ -1032,22 +1121,36 @@ export default defineComponent({
       return map[status] || base + 'status-default'
     }
 
-    const clientSubStats = (sub) => [
-      { label: 'Total Weeks', value: sub.total_weeks },
-      { label: 'Sessions/Week', value: sub.sessions_per_week },
-      { label: 'Total Sessions', value: sub.total_sessions },
-      { label: 'Completed', value: sub.completed_sessions, highlight: true },
-      { label: 'Pending', value: sub.pending_sessions, orange: true },
-    ]
+    const clientInfoFields = (client, detail) => {
+      // Prefer the full client object returned by the detail API
+      const c = detail.client || client
+      return [
+        { label: 'Full Name',         value: c.name || '—' },
+        { label: 'Email',             value: c.email || '—' },
+        { label: 'Phone',             value: c.phone || '—' },
+        { label: 'Gender',            value: c.gender || '—' },
+        { label: 'Age',               value: c.age ? c.age + ' yrs' : '—' },
+        { label: 'Address',           value: c.address || '—' },
+        { label: 'Health Conditions', value: c.health_conditions || '—' },
+        { label: 'Fitness Goals',     value: c.fitness_goals || '—' },
+        { label: 'Status',            value: `<span class="${statusPill(c.status)}">${c.status}</span>` },
+        { label: 'Registered',        value: formatDate(c.created_at) },
+      ]
+    }
 
-    const clientInfoFields = (client, detail) => [
-      { label: 'Full Name', value: client.name || '—' },
-      { label: 'Email', value: client.email || '—' },
-      { label: 'Phone', value: client.phone || '—' },
-      { label: 'Status', value: `<span class="${statusPill(client.status)}">${client.status}</span>` },
-      { label: 'Registered', value: formatDate(client.created_at) },
-      { label: 'Assigned Trainer', value: detail.trainer?.name || '—' },
-    ]
+    const clientSubStats = (sub) => {
+      if (!sub) return []
+
+      return [
+        { label: 'Total Weeks', value: sub.total_weeks },
+        { label: 'Sessions/Week', value: sub.sessions_per_week },
+        { label: 'Total Sessions', value: sub.total_sessions },
+        { label: 'Completed', value: sub.completed_sessions, highlight: true },
+        { label: 'Pending', value: sub.pending_sessions, orange: true },
+      ]
+    }
+
+
 
     const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
     const formatDateTime = (d) => d ? new Date(d).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'
@@ -1068,7 +1171,8 @@ export default defineComponent({
       if (section === 'clients') fetchClients()
       if (section === 'trainers') fetchTrainers()
       if (section === 'sessions') fetchSessions()
-      if (section === 'packages') { fetchPackages(); fetchSubscriptions() }
+     
+      if (section === 'packages') { fetchPackages(); fetchSubscriptions(); fetchPackageInterests() }
       if (section === 'queries') fetchQueries()
       if (section === 'reviews') fetchReviews()
     }
@@ -1111,8 +1215,25 @@ export default defineComponent({
       try { const data = await API('/admin/packages'); packages.value = data.items || data } catch (e) { toast('Failed to load packages', 'error') }
     }
 
+    // const fetchSubscriptions = async () => {
+    //   try { const data = await API('/admin/subscriptions'); subscriptions.value = data.items || data } catch (e) { console.warn('Subscriptions not ready') }
+    // }
     const fetchSubscriptions = async () => {
-      try { const data = await API('/admin/subscriptions'); subscriptions.value = data.items || data } catch (e) { console.warn('Subscriptions not ready') }
+      try { 
+        const data = await API('/admin/subscriptions')
+        subscriptions.value = data.items || data 
+      } catch (e) { 
+        console.warn('Subscriptions not ready', e)
+      }
+    }
+
+    const fetchPackageInterests = async () => {
+      try {
+        const data = await API('/admin/packages/interests')
+        packageInterests.value = data.items || []
+      } catch (e) { console.warn('Package interests not ready')
+        packageInterests.value = []
+       }
     }
 
     const fetchQueries = async () => {
@@ -1374,7 +1495,10 @@ export default defineComponent({
 
     onMounted(() => {
       fetchStats(); fetchTrainers(); fetchClients(); fetchPackages()
+      fetchSubscriptions()
+      fetchPackageInterests()
       startAutoRefresh()
+
     })
 
     onUnmounted(() => { if (autoRefreshTimer) clearInterval(autoRefreshTimer) })
@@ -1403,7 +1527,11 @@ export default defineComponent({
       openPackageModal, submitPackage, togglePackage, confirmDeletePackage,
       respondQuery, approveReview, rejectReview,
       confirmDelete, executeDelete, removeToast,
-      fetchClients, fetchTrainers, fetchSessions, fetchQueries, fetchReviews
+      fetchClients, fetchTrainers, fetchSessions, fetchQueries, fetchReviews,packageInterests,
+      subscriptions,
+      fetchSubscriptions,
+      fetchPackageInterests,
+      logout
     }
   }
 })
@@ -1854,7 +1982,8 @@ body { font-family: 'Inter', sans-serif; background: #f5f4f0; }
 }
 .detail-info { flex: 1; min-width: 0; }
 .detail-name { font-family: 'Lora', serif; font-size: 22px; color: #111827; margin-bottom: 8px; }
-.detail-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.detail-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; overflow-wrap: break-word; word-break: break-word; }
+.detail-tags .tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-actions { display: flex; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
 
 /* ═══ TABS ═══ */
@@ -2090,11 +2219,11 @@ body { font-family: 'Inter', sans-serif; background: #f5f4f0; }
 /* ═══ INFO GRID ═══ */
 .info-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px 24px;
 }
 .field-label { display: block; font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-.field-value { font-size: 13px; color: #374151; }
+.field-value { font-size: 13px; color: #374151; overflow-wrap: break-word; word-break: break-word; min-width: 0; }
 
 /* ═══ PROGRESS ═══ */
 .sub-stats-grid {
@@ -2284,4 +2413,16 @@ body { font-family: 'Inter', sans-serif; background: #f5f4f0; }
   cursor: pointer; color: rgba(255,255,255,0.6); transition: color 0.15s;
 }
 .toast-close:hover { color: white; }
+
+/* ═══ LOGOUT BUTTON ═══ */
+.logout-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 8px;
+  border: 1px solid #e5e7eb; background: white;
+  cursor: pointer; font-size: 13px; font-weight: 500;
+  color: #6b7280; transition: all 0.15s;
+}
+.logout-btn:hover { background: #fef2f2; border-color: #fca5a5; color: #dc2626; }
+.logout-icon { font-size: 14px; }
+@media (max-width: 640px) { .logout-label { display: none; } }
 </style>

@@ -135,15 +135,22 @@ def google_auth():
     
     email = google_data['email']
     google_id = google_data['google_id']
-    
-    # Check admin
+
+    # Check admin — first look up by email in the users (admin) collection,
+    # then also catch via ADMIN_EMAIL config.  This prevents a 403 mismatch
+    # when the env var and the Google account email differ slightly.
+    existing_admin = user_model.find_by_email(email)
+    if existing_admin and existing_admin.get('role') == 'admin':
+        token = generate_jwt(existing_admin['_id'], 'admin')
+        return jsonify({'token': token, 'user': existing_admin}), 200
+
     if email == Config.ADMIN_EMAIL:
-        admin = user_model.find_by_email(email)
-        if not admin:
-            admin = user_model.create_admin(email, Config.ADMIN_NAME, google_id, google_data.get('picture'))
+        admin = existing_admin or user_model.create_admin(
+            email, Config.ADMIN_NAME, google_id, google_data.get('picture')
+        )
         token = generate_jwt(admin['_id'], 'admin')
         return jsonify({'token': token, 'user': admin}), 200
-    
+
     # Check existing client
     client = client_model.find_by_email(email)
     if client:
@@ -332,7 +339,7 @@ def admin_get_trainers():
 @token_required
 @admin_required
 def admin_get_trainer(trainer_id):
-    """Get trainer details with reviews and clients"""
+    """Get trainer details with reviews, clients, and sessions"""
     trainer = trainer_model.find_by_id(trainer_id)
     if not trainer:
         return jsonify({'error': 'Trainer not found'}), 404
@@ -351,6 +358,23 @@ def admin_get_trainer(trainer_id):
             client['sessions_completed'] = assignment.get('sessions_completed', 0)
             clients.append(client)
     trainer['assigned_clients'] = clients
+
+    # Get sessions for this trainer
+    from bson import ObjectId
+    try:
+        tid_query = {'$in': [trainer_id, ObjectId(trainer_id)]}
+    except Exception:
+        tid_query = trainer_id
+    raw_sessions = list(session_model.collection.find(
+        {'trainer_id': tid_query}
+    ).sort('scheduled_at', -1))
+    sessions = []
+    for s in raw_sessions:
+        s['_id'] = str(s['_id'])
+        client_obj = client_model.find_by_id(str(s.get('client_id', '')))
+        s['client'] = {'_id': str(client_obj['_id']), 'name': client_obj.get('name', '—')} if client_obj else None
+        sessions.append(s)
+    trainer['sessions'] = sessions
     
     return jsonify(trainer), 200
 
@@ -425,6 +449,29 @@ def admin_block_trainer(trainer_id):
     
     return jsonify({'message': 'Trainer blocked'}), 200
 
+@app.route('/api/admin/trainers/<trainer_id>/unblock', methods=['PUT'])
+@token_required
+@admin_required
+def admin_unblock_trainer(trainer_id):
+    """Unblock trainer account"""
+    trainer = trainer_model.find_by_id(trainer_id)
+    if not trainer:
+        return jsonify({'error': 'Trainer not found'}), 404
+
+    trainer_model.approve(trainer_id, request.user['user_id'])
+
+    send_notification_with_channels(
+        trainer,
+        "Account Unblocked",
+        "Your SattvaFlow trainer account has been unblocked. You can now log in.",
+        'success',
+        "/trainer/dashboard"
+    )
+
+    log_activity(request.user['user_id'], 'admin', 'unblock_trainer', f"Unblocked trainer {trainer['name']}")
+    return jsonify({'message': 'Trainer unblocked'}), 200
+
+
 @app.route('/api/admin/clients', methods=['GET'])
 @token_required
 @admin_required
@@ -472,6 +519,29 @@ def admin_activate_client(client_id):
     log_activity(request.user['user_id'], 'admin', 'activate_client', f"Activated client {client['name']}")
     
     return jsonify({'message': 'Client activated'}), 200
+
+
+@app.route('/api/admin/clients/<client_id>/block', methods=['PUT'])
+@token_required
+@admin_required
+def admin_block_client(client_id):
+    """Block client account"""
+    client = client_model.find_by_id(client_id)
+    if not client:
+        return jsonify({'error': 'Client not found'}), 404
+
+    client_model.block(client_id)
+
+    send_notification_with_channels(
+        client,
+        "Account Blocked",
+        "Your SattvaFlow account has been blocked. Please contact admin for details.",
+        'error',
+        "/login"
+    )
+
+    log_activity(request.user['user_id'], 'admin', 'block_client', f"Blocked client {client['name']}")
+    return jsonify({'message': 'Client blocked'}), 200
 
 
 @app.route('/api/admin/clients/<client_id>/detail', methods=['GET'])
@@ -858,47 +928,6 @@ def client_get_progress():
 
 
 
-@app.route('/api/admin/trainers/<trainer_id>/unblock', methods=['PUT'])
-@token_required
-@admin_required
-def admin_unblock_trainer(trainer_id):
-    """Unblock trainer account"""
-    trainer = trainer_model.find_by_id(trainer_id)
-    if not trainer:
-        return jsonify({'error': 'Trainer not found'}), 404
- 
-    trainer_model.approve(trainer_id, request.user['user_id'])
- 
-    send_notification_with_channels(
-        trainer,
-        "Account Unblocked",
-        "Your SattvaFlow trainer account has been unblocked.",
-        'success',
-        "/trainer/dashboard"
-    )
-    return jsonify({'message': 'Trainer unblocked'}), 200
- 
-
-@app.route('/api/admin/clients/<client_id>/block', methods=['PUT'])
-@token_required
-@admin_required
-def admin_block_client(client_id):
-    """Block client"""
-    client = client_model.find_by_id(client_id)
-    if not client:
-        return jsonify({'error': 'Client not found'}), 404
-    
-    client_model.block(client_id)
-    
-    send_notification_with_channels(
-        client,
-        "Account Blocked",
-        "Your account has been blocked. Please contact admin.",
-        'error',
-        "/login"
-    )
-    
-    return jsonify({'message': 'Client blocked'}), 200
 
 @app.route('/api/admin/assignments', methods=['GET'])
 @token_required
@@ -1841,6 +1870,31 @@ def client_get_packages():
     packages = package_model.get_active()
     return jsonify(packages), 200
 
+# @app.route('/api/client/packages/<package_id>/interest', methods=['POST'])
+# @token_required
+# @client_required
+# def client_express_interest(package_id):
+#     """Express interest in a package"""
+#     client_id = request.user['user_id']
+#     client = client_model.find_by_id(client_id)
+#     package = package_model.find_by_id(package_id)
+    
+#     if not package:
+#         return jsonify({'error': 'Package not found'}), 404
+    
+#     package_model.express_interest(package_id, client_id, client['name'])
+    
+#     # Notify admin
+#     notify_admin(
+#         f"Package Interest: {package['title']}",
+#         f"Client {client['name']} is interested in package '{package['title']}'.",
+#         'package',
+#         f"/admin/packages"
+#     )
+    
+#     return jsonify({'message': 'Interest recorded. Admin will contact you soon.'}), 200
+
+
 @app.route('/api/client/packages/<package_id>/interest', methods=['POST'])
 @token_required
 @client_required
@@ -1849,21 +1903,48 @@ def client_express_interest(package_id):
     client_id = request.user['user_id']
     client = client_model.find_by_id(client_id)
     package = package_model.find_by_id(package_id)
-    
+
     if not package:
         return jsonify({'error': 'Package not found'}), 404
-    
+
     package_model.express_interest(package_id, client_id, client['name'])
-    
-    # Notify admin
+
+    # Resolve assigned trainer (if any)
+    assigned_trainer = None
+    assignment = assignment_model.get_client_trainer(client_id)
+    if assignment:
+        assigned_trainer = trainer_model.find_by_id(assignment['trainer_id'])
+
+    trainer_name = assigned_trainer['name'] if assigned_trainer else 'Not yet assigned'
+
+    # Notify admin — include trainer name in message
     notify_admin(
         f"Package Interest: {package['title']}",
-        f"Client {client['name']} is interested in package '{package['title']}'.",
+        f"Client {client['name']} is interested in '{package['title']}'. "
+        f"Assigned trainer: {trainer_name}.",
         'package',
-        f"/admin/packages"
+        '/admin/packages'
     )
-    
+
+    # Also notify the assigned trainer directly
+    if assigned_trainer:
+        send_notification_with_channels(
+            assigned_trainer,
+            f"Client Interest: {package['title']}",
+            f"Your client {client['name']} is interested in the '{package['title']}' package. "
+            f"Please follow up with them.",
+            'package',
+            f"/trainer/clients/{client_id}"
+        )
+
+    log_activity(
+        client_id, 'client', 'express_interest',
+        f"Expressed interest in package '{package['title']}'",
+        {'package_id': str(package_id), 'trainer_id': str(assignment['trainer_id']) if assignment else None}
+    )
+
     return jsonify({'message': 'Interest recorded. Admin will contact you soon.'}), 200
+
 
 @app.route('/api/client/queries', methods=['GET', 'POST'])
 @token_required
@@ -2047,6 +2128,22 @@ def public_trainers():
         trainer.pop('google_id', None)
     
     return jsonify(result), 200
+
+
+# Add this endpoint to app.py after the existing package routes
+
+@app.route('/api/admin/packages/interests', methods=['GET'])
+@token_required
+@admin_required
+def admin_get_package_interests():
+    """Get all package interest expressions"""
+    try:
+        interests = package_model.get_all_interests()
+        return jsonify({'items': interests}), 200
+    except Exception as e:
+        logger.error(f"Error fetching package interests: {e}")
+        return jsonify({'items': []}), 200
+
 
 @app.route('/api/health', methods=['GET'])
 def health_check():

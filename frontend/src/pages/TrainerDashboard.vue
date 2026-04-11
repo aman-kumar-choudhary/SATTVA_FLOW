@@ -68,6 +68,10 @@
               <div class="user-avatar">{{ userName.charAt(0).toUpperCase() }}</div>
               <span class="user-name">{{ userName }}</span>
             </div>
+            <button class="logout-btn" @click="logout" title="Logout">
+              <span class="logout-icon">⏻</span>
+              <span class="logout-label">Logout</span>
+            </button>
           </div>
         </div>
         <div v-if="showNotifications" class="notif-dropdown">
@@ -443,6 +447,7 @@ export default {
   async mounted() { await this.loadData(); await this.loadProfile(); this.startPolling() },
   beforeUnmount() { if (this.pollInterval) clearInterval(this.pollInterval) },
   methods: {
+    logout() { localStorage.clear(); this.$router.push('/') },
     navigate(section) { this.activeSection = section; this.mobileSidebarOpen = false; this.selectedClient = null },
     openClientDetail(client) {
       if (this.selectedClient?._id === client._id) { this.selectedClient = null; return }
@@ -604,7 +609,7 @@ export default {
 .client-card:hover { border-color: rgba(74,124,89,0.3); box-shadow: 0 4px 12px rgba(74,124,89,0.08); }
 .client-card--selected { border-color: #4a7c59; box-shadow: 0 4px 16px rgba(74,124,89,0.15); }
 .client-avatar { width: 48px; height: 48px; border-radius: 50%; background: rgba(124,106,74,0.15); color: #7c6a4a; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; flex-shrink: 0; }
-.client-info { flex: 1; min-width: 0; }
+.client-info { flex: 1; min-width: 0; overflow: hidden; }
 .client-actions { flex-shrink: 0; }
 .client-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .health-warn { font-size: 11px; color: #b45309; background: #fef3c7; border-radius: 6px; padding: 3px 8px; line-height: 1.4; }
@@ -617,7 +622,7 @@ export default {
 .cdp-avatar { width: 56px; height: 56px; border-radius: 50%; background: #c9a84c; color: #1a1f1a; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; flex-shrink: 0; }
 .cdp-header-info { flex: 1; }
 .cdp-name { font-family: 'Lora', serif; font-size: 20px; color: white; margin-bottom: 6px; }
-.cdp-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: rgba(255,255,255,0.6); }
+.cdp-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 12px; color: rgba(255,255,255,0.6); overflow-wrap: break-word; word-break: break-word; min-width: 0; }
 .cdp-close { background: rgba(255,255,255,0.1); border: none; color: white; font-size: 20px; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s; }
 .cdp-close:hover { background: rgba(255,255,255,0.2); }
 .cdp-tabs { display: flex; border-bottom: 1px solid #f0f0ee; padding: 0 16px; gap: 4px; background: #fafaf8; }
@@ -749,4 +754,16 @@ export default {
   .quick-actions-grid { grid-template-columns: 1fr 1fr; }
   .page-section { padding: 10px; }
 }
+
+/* ═══ LOGOUT BUTTON ═══ */
+.logout-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 8px;
+  border: 1px solid #e5e7eb; background: white;
+  cursor: pointer; font-size: 13px; font-weight: 500;
+  color: #6b7280; transition: all 0.15s;
+}
+.logout-btn:hover { background: #fef2f2; border-color: #fca5a5; color: #dc2626; }
+.logout-icon { font-size: 14px; }
+@media (max-width: 640px) { .logout-label { display: none; } }
 </style>

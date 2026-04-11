@@ -68,6 +68,10 @@
               <div class="user-avatar">{{ userName.charAt(0).toUpperCase() }}</div>
               <span class="user-name">{{ userName }}</span>
             </div>
+            <button class="logout-btn" @click="logout" title="Logout">
+              <span class="logout-icon">⏻</span>
+              <span class="logout-label">Logout</span>
+            </button>
           </div>
         </div>
         <div v-if="showNotifications" class="notif-dropdown">
@@ -434,6 +438,7 @@ export default {
   async mounted() { await this.loadData(); await this.loadProfile(); this.startPolling() },
   beforeUnmount() { if (this.pollInterval) clearInterval(this.pollInterval) },
   methods: {
+    logout() { localStorage.clear(); this.$router.push('/') },
     navigate(section) { this.activeSection = section; this.mobileSidebarOpen = false },
     statusPill(status) {
       const base = 'status-pill '
@@ -737,4 +742,16 @@ export default {
   .quick-actions-grid { grid-template-columns: 1fr 1fr; }
   .page-section { padding: 10px; }
 }
+
+/* ═══ LOGOUT BUTTON ═══ */
+.logout-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 8px;
+  border: 1px solid #e5e7eb; background: white;
+  cursor: pointer; font-size: 13px; font-weight: 500;
+  color: #6b7280; transition: all 0.15s;
+}
+.logout-btn:hover { background: #fef2f2; border-color: #fca5a5; color: #dc2626; }
+.logout-icon { font-size: 14px; }
+@media (max-width: 640px) { .logout-label { display: none; } }
 </style>

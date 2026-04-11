@@ -1061,7 +1061,84 @@ class ClientModel_Patch:
             'pages': (total + per_page - 1) // per_page
         }
  
- 
+ # Add this method to the PackageModel class in models.py
+
+def get_all_interests(self):
+    """Get all package interest expressions"""
+    try:
+        interests = list(self.db.package_interests.find().sort('created_at', -1))
+        for interest in interests:
+            interest['_id'] = str(interest['_id'])
+            interest['created_at'] = interest.get('created_at', datetime.utcnow())
+            
+            # Get client details
+            client = self.db.clients.find_one({'_id': ObjectId(interest['client_id'])})
+            if client:
+                interest['client_name'] = client.get('name', 'Unknown')
+                interest['client_email'] = client.get('email', '')
+            
+            # Get package details
+            package = self.db.packages.find_one({'_id': ObjectId(interest['package_id'])})
+            if package:
+                interest['package_title'] = package.get('title', 'Unknown')
+                interest['package_price'] = package.get('price', 0)
+            
+            # Get assigned trainer for this client
+            assignment = self.db.assignments.find_one({
+                'client_id': interest['client_id'],
+                'status': 'active'
+            })
+            if assignment:
+                trainer = self.db.trainers.find_one({'_id': ObjectId(assignment['trainer_id'])})
+                if trainer:
+                    interest['trainer'] = {
+                        '_id': str(trainer['_id']),
+                        'name': trainer.get('name', ''),
+                        'specialization': trainer.get('specialization', '')
+                    }
+        
+        return interests
+    except Exception as e:
+        logger.error(f"Error in get_all_interests: {e}")
+        return []
+
+
+# Add this method to the PackageModel class in models.py
+
+def express_interest(self, package_id, client_id, client_name):
+    """Record a client's interest in a package"""
+    try:
+        interest = {
+            'package_id': package_id,
+            'client_id': client_id,
+            'client_name': client_name,
+            'status': 'pending',
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow()
+        }
+        
+        # Check if already expressed interest
+        existing = self.db.package_interests.find_one({
+            'package_id': package_id,
+            'client_id': client_id
+        })
+        
+        if existing:
+            # Update existing
+            self.db.package_interests.update_one(
+                {'_id': existing['_id']},
+                {'$set': {'updated_at': datetime.utcnow()}}
+            )
+            return existing
+        else:
+            # Create new
+            result = self.db.package_interests.insert_one(interest)
+            interest['_id'] = str(result.inserted_id)
+            return interest
+    except Exception as e:
+        logger.error(f"Error in express_interest: {e}")
+        return None
+
 # ─── PATCH SessionModel: get_client_sessions returns with attendance ──
 # Existing method is fine; ensure mark_attendance also sets status='completed':
  
