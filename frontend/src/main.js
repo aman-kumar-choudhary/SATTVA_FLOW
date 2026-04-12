@@ -26,10 +26,10 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  // const token = localStorage.getItem('token')
-  // const userRole = localStorage.getItem('userRole')
-  const token = sessionStorage.getItem('token')
-  const userRole = sessionStorage.getItem('userRole')
+  const token = localStorage.getItem('token')
+  const userRole = localStorage.getItem('userRole')
+  // const token = sessionStorage.getItem('token')
+  // const userRole = sessionStorage.getItem('userRole')
 
   if (to.meta.requiresAuth && !token) {
     next('/login')

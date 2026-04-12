@@ -174,7 +174,10 @@ export default {
   data() {
     return {
       isScrolled: false,
-      mobileMenuOpen: false
+      mobileMenuOpen: false,
+      // FIX: localStorage is not reactive. We use a counter that we manually
+      // bump whenever auth state changes so computed props re-evaluate.
+      authKey: 0
     }
   },
   computed: {
@@ -183,19 +186,29 @@ export default {
       return dashboardPaths.some(p => this.$route.path.startsWith(p))
     },
     isAuthenticated() {
+      // eslint-disable-next-line no-unused-expressions
+      this.authKey // subscribe to authKey so this re-runs when it changes
       return !!localStorage.getItem('token')
     },
     userName() {
+      // eslint-disable-next-line no-unused-expressions
+      this.authKey
       return localStorage.getItem('userName') || ''
     }
   },
   mounted() {
     window.addEventListener('scroll', this.handleScroll)
+    // FIX: Listen for a custom event fired by Login/Signup after saving session
+    window.addEventListener('auth-changed', this.onAuthChanged)
   },
   beforeUnmount() {
     window.removeEventListener('scroll', this.handleScroll)
+    window.removeEventListener('auth-changed', this.onAuthChanged)
   },
   methods: {
+    onAuthChanged() {
+      this.authKey++ // triggers recompute of isAuthenticated / userName
+    },
     handleScroll() {
       this.isScrolled = window.scrollY > 60
     },
@@ -226,6 +239,8 @@ export default {
       localStorage.removeItem('userRole')
       localStorage.removeItem('userName')
       localStorage.removeItem('userId')
+      localStorage.removeItem('user')
+      this.authKey++ // FIX: force navbar to update immediately
       this.$router.push('/')
       this.closeMenu()
     },

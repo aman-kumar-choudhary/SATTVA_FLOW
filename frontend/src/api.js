@@ -7,11 +7,17 @@ function getToken() {
   return localStorage.getItem('token')
 }
 
+// function authHeaders() {
+//   return {
+//     'Content-Type': 'application/json',
+//     'Authorization': `Bearer ${getToken()}`
+//   }
+// }
 function authHeaders() {
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${getToken()}`
-  }
+  const token = getToken()
+  const headers = { 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`  // only add if token exists
+  return headers
 }
 
 async function request(method, path, body = null) {

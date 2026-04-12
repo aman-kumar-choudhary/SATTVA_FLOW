@@ -316,6 +316,11 @@ export default {
           } catch (redirectErr) {
             this.error = 'Please allow popups for this site to sign up with Google.'
           }
+        } else if (err.code === 'auth/unauthorized-domain') {
+          // FIX: this means the current domain isn't added in Firebase Console
+          // → Authentication → Settings → Authorized domains
+          this.error = 'This domain is not authorised for Google Sign-In. Please contact support.'
+          console.error('Add this domain to Firebase Console → Authentication → Authorized domains')
         } else {
           this.error = err.message || 'Google sign-up failed. Please try again.'
         }
@@ -362,6 +367,8 @@ export default {
       localStorage.setItem('userName', user.name)
       localStorage.setItem('userId', user.id)
       localStorage.setItem('user', JSON.stringify(user))
+      // FIX: notify App.vue so navbar updates without a page refresh
+      window.dispatchEvent(new Event('auth-changed'))
     },
 
     redirectToDashboard(role) {
