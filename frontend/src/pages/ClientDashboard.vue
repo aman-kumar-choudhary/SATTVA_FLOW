@@ -182,10 +182,15 @@
             <ul v-if="pkg.features?.length" class="pkg-features">
               <li v-for="f in pkg.features" :key="f">✓ {{ f }}</li>
             </ul>
-            <button class="btn-primary w-full mt-auto" @click="expressInterest(pkg._id)" :disabled="interestedPackages.has(pkg._id)">
-              {{ interestedPackages.has(pkg._id) ? '✓ Interest Recorded' : "I'm Interested" }}
+            <button
+              class="btn-primary w-full mt-auto"
+              @click="expressInterest(pkg._id)"
+              :disabled="selectedPackageId === pkg._id"
+            >
+              {{ selectedPackageId === pkg._id ? '✓ Current Selection' : (selectedPackageId ? 'Change Selection' : "Select This Package") }}
             </button>
-            <p class="pkg-cta-note">Admin will contact you to enroll</p>
+            <p v-if="selectedPackageId === pkg._id" class="pkg-cta-note" style="color:#4a7c59; font-weight:600">Admin will contact you soon!</p>
+            <p v-else class="pkg-cta-note">Admin will only see your latest choice</p>
           </div>
         </div>
       </section>
@@ -414,7 +419,7 @@ export default {
       },
       trainer: null, sessions: [], plans: [], packages: [],
       queries: [], myReviews: [], notifications: [],
-      interestedPackages: new Set(),
+      selectedPackageId: null,
       profile: null,
       profileForm: {
         name: '', phone: '',
@@ -446,14 +451,17 @@ export default {
       return map[status] || base+'status-default'
     },
     async loadData() {
-      const [trainerR, sessionsR, plansR, pkgsR, queriesR, reviewsR, notifsR] = await Promise.all([
-        api.getMyTrainer(), api.getMySessions(), api.getMyPlans(), api.getMyPackages(),
-        api.getMyQueries(), api.getMyReviews(), api.getNotifications()
-      ])
-      if (trainerR.success) this.trainer = trainerR.trainer || null
-      this.sessions = sessionsR.items || []; this.plans = plansR.items || []
-      this.packages = pkgsR.items || []; this.queries = queriesR.items || []
-      this.myReviews = reviewsR.items || []; this.notifications = notifsR.items || []
+      const r = await api.getDashboardSummary()
+      if (r.success) {
+        this.trainer = r.trainer
+        this.sessions = r.sessions?.items || []
+        this.plans = r.plans?.items || []
+        this.packages = r.packages?.items || []
+        this.queries = r.queries?.items || []
+        this.myReviews = r.reviews?.items || []
+        this.notifications = r.notifications?.items || []
+        this.selectedPackageId = r.selected_package_id
+      }
     },
     startPolling() {
       this.pollInterval = setInterval(async () => {
@@ -463,8 +471,11 @@ export default {
     },
     async expressInterest(pkgId) {
       const r = await api.expressInterest(pkgId)
-      if (r.success) this.interestedPackages = new Set([...this.interestedPackages, pkgId])
-      else alert(r.error || 'Failed to record interest')
+      if (r.success) {
+        this.selectedPackageId = pkgId
+      } else {
+        alert(r.error || 'Failed to record selection')
+      }
     },
     async submitQuery() {
       if (!this.queryForm.subject || !this.queryForm.message) { alert('Please fill in all fields'); return }

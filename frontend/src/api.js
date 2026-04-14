@@ -1,5 +1,4 @@
-// api.js - Centralized API module for SattvaFlow
-// Fixes: correct response parsing for paginated and non-paginated endpoints
+// api.js 
 
 const BASE_URL = import.meta.env.VITE_API_URL || ''
 
@@ -7,16 +6,11 @@ function getToken() {
   return localStorage.getItem('token')
 }
 
-// function authHeaders() {
-//   return {
-//     'Content-Type': 'application/json',
-//     'Authorization': `Bearer ${getToken()}`
-//   }
-// }
+
 function authHeaders() {
   const token = getToken()
   const headers = { 'Content-Type': 'application/json' }
-  if (token) headers['Authorization'] = `Bearer ${token}`  // only add if token exists
+  if (token) headers['Authorization'] = `Bearer ${token}`
   return headers
 }
 
@@ -49,11 +43,7 @@ async function request(method, path, body = null) {
   }
 }
 
-// ── helpers to unwrap paginated vs flat responses ──────────────────────────
-// Backend returns either:
-//   • paginated: { items: [...], total, page, pages }
-//   • flat array: [...]
-//   • single object: { ... }
+
 
 function unwrapList(result) {
   // Returns array on success, [] on failure
@@ -262,6 +252,11 @@ export const clientApi = {
     if (d && d.trainer === null) return { success: true, trainer: null }
     return { success: true, trainer: d }
   },
+  async getDashboardSummary() {
+    const r = await request('GET', '/api/client/dashboard-summary')
+    if (!r.success) return { success: false, error: r.error }
+    return { success: true, ...r.data }
+  },
   async getMySessions() {
     const r = await request('GET', '/api/client/sessions')
     return { success: r.success, items: unwrapList(r) }
@@ -414,6 +409,7 @@ const api = {
   createQuery: (s, m) => clientApi.createQuery(s, m),
   getMyReviews: () => clientApi.getMyReviews(),
   createReview: (r, c) => clientApi.createReview(r, c),
+  getDashboardSummary: () => clientApi.getDashboardSummary(),
   // Notifications
   getNotifications: (unreadOnly) => notificationApi.getAll(unreadOnly),
   markNotificationRead: (id) => notificationApi.markRead(id),

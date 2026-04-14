@@ -73,8 +73,15 @@ def log_activity(user_id, user_role, action_type, description, metadata=None):
     activity_log_model.log(user_id, user_role, action_type, description, metadata)
 
 def create_notification(user_id, title, message, ntype='info', link=None):
-    """Create in-app notification"""
-    return notification_model.create(user_id, title, message, ntype, link)
+    """Create in-app notification and trigger external channels (Email/SMTP)"""
+    notif = notification_model.create(user_id, title, message, ntype, link)
+    
+    # Trigger email notification
+    user, _ = get_user_by_id(user_id)
+    if user:
+        NotificationService.send_notification(user, title, message, ntype, link)
+    
+    return notif
 
 def send_notification_with_channels(user, title, message, ntype='info', link=None):
     """Send notification via all channels"""
@@ -190,6 +197,11 @@ def google_complete():
             token = generate_jwt(existing['_id'], 'client')
             return jsonify({'token': token, 'user': existing}), 200
         
+        # Check phone uniqueness
+        phone = data.get('phone')
+        if phone and client_model.find_by_phone(phone):
+            return jsonify({'error': 'Phone number already registered with another account'}), 400
+        
         # Create client
         client = client_model.create(data)
         
@@ -218,6 +230,11 @@ def google_complete():
         if existing:
             token = generate_jwt(existing['_id'], 'trainer')
             return jsonify({'token': token, 'user': existing}), 200
+        
+        # Check phone uniqueness
+        phone = data.get('phone')
+        if phone and trainer_model.find_by_phone(phone):
+            return jsonify({'error': 'Phone number already registered with another account'}), 400
         
         trainer = trainer_model.create(data)
         
@@ -569,6 +586,12 @@ def admin_client_detail(client_id):
     subscription = subscription_model.get_active(client_id)
     progress = subscription_model.compute_progress(subscription)
 
+    # 9. Selected package interest
+    selected_interest = db.package_interests.find_one({'client_id': client_id})
+    selected_package = None
+    if selected_interest:
+        selected_package = package_model.find_by_id(selected_interest['package_id'])
+
     return jsonify({
         'client': client,
         'trainer': trainer,
@@ -576,6 +599,7 @@ def admin_client_detail(client_id):
         'queries': queries_data,
         'subscription': subscription,
         'progress': progress,
+        'selected_package': selected_package
     }), 200
  
 @app.route('/api/admin/clients/<client_id>/assign-trainer', methods=['POST'])
@@ -793,8 +817,62 @@ def admin_get_sessions_filtered():
     }), 200
  
  
+# ─── CONSOLIDATED DASHBOARD SUMMARY ───
+
+@app.route('/api/client/dashboard-summary', methods=['GET'])
+@token_required
+@client_required
+def client_dashboard_summary():
+    """Consolidated endpoint for client dashboard to improve performance."""
+    client_id = request.user['user_id']
+    
+    # 1. Get trainer
+    assignment = assignment_model.get_client_trainer(client_id)
+    trainer = None
+    if assignment:
+        trainer = trainer_model.find_by_id(assignment['trainer_id'])
+    
+    # 2. Get sessions
+    sessions = session_model.get_client_sessions(client_id)
+    
+    # 3. Get plans
+    plans = plan_model.get_client_plans(client_id)
+    
+    # 4. Get active packages
+    packages = package_model.get_active()
+    
+    # 5. Get queries
+    queries = query_model.get_all_for_user(client_id)
+    
+    # 6. Get reviews
+    reviews = review_model.get_client_reviews(client_id)
+    
+    # 7. Get notifications
+    notifications = notification_model.get_user_notifications(client_id)
+    
+    # 8. Get subscription & progress
+    subscription = subscription_model.get_active(client_id)
+    progress = subscription_model.compute_progress(subscription)
+    
+    # 9. Get selected package interest (new single-selection rule)
+    selected_interest = db.package_interests.find_one({'client_id': client_id})
+    selected_package_id = str(selected_interest['package_id']) if selected_interest else None
+
+    return jsonify({
+        'trainer': trainer,
+        'sessions': { 'items': sessions },
+        'plans': { 'items': plans },
+        'packages': { 'items': packages },
+        'queries': { 'items': queries },
+        'reviews': { 'items': reviews },
+        'notifications': { 'items': notifications['items'] },
+        'unread_count': notifications['unread_count'],
+        'subscription': subscription,
+        'progress': progress,
+        'selected_package_id': selected_package_id
+    }), 200
+
 # ─── PATCH 11: FIXED ATTENDANCE MARKING ───
-# Replace the existing trainer mark_attendance route with this:
  
 @app.route('/api/trainer/sessions/<session_id>/attendance', methods=['PUT'])
 @token_required

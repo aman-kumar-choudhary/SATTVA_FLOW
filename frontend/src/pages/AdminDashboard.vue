@@ -323,16 +323,64 @@
                 </div>
               </div>
             </div>
+            <!-- Client has selected a package but no active subscription yet -->
+            <div v-else-if="selectedClientDetail.selected_package" class="client-pkg-selection mb-4">
+              <div class="client-pkg-header">
+                <span class="client-pkg-badge">⭐ Client's Package Selection</span>
+              </div>
+              <div class="client-pkg-body">
+                <div class="client-pkg-info">
+                  <div class="client-pkg-title">{{ selectedClientDetail.selected_package.title }}</div>
+                  <div class="client-pkg-meta">
+                    <span>₹{{ selectedClientDetail.selected_package.price?.toLocaleString('en-IN') }}</span>
+                    <span class="meta-dot">·</span>
+                    <span>{{ selectedClientDetail.selected_package.duration_weeks }} weeks</span>
+                    <span class="meta-dot">·</span>
+                    <span>{{ selectedClientDetail.selected_package.sessions_per_week }} sessions/wk</span>
+                    <span class="meta-dot">·</span>
+                    <span>{{ selectedClientDetail.selected_package.sessions_count }} total sessions</span>
+                  </div>
+                  <p v-if="selectedClientDetail.selected_package.description" class="client-pkg-desc">{{ selectedClientDetail.selected_package.description }}</p>
+                </div>
+                <div class="client-pkg-actions">
+                  <button class="btn-approve" @click="assignPackageToClient" :disabled="actionLoading">
+                    {{ actionLoading ? 'Assigning…' : '✓ Confirm & Assign' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <!-- No selection at all -->
             <div v-else class="info-banner mb-4">
               <span>ℹ</span>
               <span>No active package. Client must select one from the packages page.</span>
             </div>
+
             <div v-if="!selectedClientDetail.subscription" class="card">
-              <h4 class="font-medium mb-3">Assign a Package (Admin Override)</h4>
+              <h4 class="font-medium mb-3">
+                {{ selectedClientDetail.selected_package ? 'Override Package Assignment' : 'Assign a Package (Admin Override)' }}
+              </h4>
+              <p v-if="selectedClientDetail.selected_package" class="text-xs text-muted mb-3">
+                The client has already chosen a package above. You can override it by selecting a different one below.
+              </p>
               <div class="row-gap">
                 <select v-model="packageToAssign" class="form-input flex-1">
                   <option value="">— Select Package —</option>
-                  <option v-for="pkg in packages" :key="pkg._id" :value="pkg._id">
+                  <!-- If the client has selected a package, show it first as their choice -->
+                  <option
+                    v-if="selectedClientDetail.selected_package"
+                    :value="selectedClientDetail.selected_package._id"
+                  >
+                    ⭐ {{ selectedClientDetail.selected_package.title }}
+                    ({{ selectedClientDetail.selected_package.duration_weeks }}w ·
+                    {{ selectedClientDetail.selected_package.sessions_per_week }}/wk ·
+                    {{ selectedClientDetail.selected_package.sessions_count }} sessions) — Client's Choice
+                  </option>
+                  <!-- Then show remaining packages as override options -->
+                  <option
+                    v-for="pkg in packages.filter(p => !selectedClientDetail.selected_package || p._id !== selectedClientDetail.selected_package._id)"
+                    :key="pkg._id"
+                    :value="pkg._id"
+                  >
                     {{ pkg.title }} ({{ pkg.duration_weeks }}w · {{ pkg.sessions_per_week }}/wk · {{ pkg.sessions_count }} sessions)
                   </option>
                 </select>
@@ -1263,8 +1311,13 @@ export default defineComponent({
 
     const loadClientDetail = async (clientId) => {
       loading.value = true
-      try { const data = await API(`/admin/clients/${clientId}/detail`); selectedClientDetail.value = data; trainerToAssign.value = data.trainer?._id || '' }
-      catch (e) { toast('Failed to load client details', 'error') }
+      try {
+        const data = await API(`/admin/clients/${clientId}/detail`)
+        selectedClientDetail.value = data
+        trainerToAssign.value = data.trainer?._id || ''
+        // Pre-select the package the client has chosen (if no active subscription yet)
+        packageToAssign.value = (!data.subscription && data.selected_package?._id) ? data.selected_package._id : ''
+      } catch (e) { toast('Failed to load client details', 'error') }
       loading.value = false
     }
 
@@ -2312,6 +2365,57 @@ body { font-family: 'Inter', sans-serif; background: #f5f4f0; }
   font-size: 13px;
   color: #1d4ed8;
 }
+
+/* ═══ CLIENT PACKAGE SELECTION CARD ═══ */
+.client-pkg-selection {
+  border: 2px solid #4a7c59;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.client-pkg-header {
+  background: #4a7c59;
+  padding: 8px 16px;
+}
+.client-pkg-badge {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.client-pkg-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #f0f7f2;
+  padding: 14px 16px;
+  flex-wrap: wrap;
+}
+.client-pkg-info { flex: 1; min-width: 0; }
+.client-pkg-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 4px;
+}
+.client-pkg-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: #4a7c59;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+.meta-dot { color: #9ca3af; }
+.client-pkg-desc {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.client-pkg-actions { flex-shrink: 0; }
 
 /* ═══ EMPTY STATE ═══ */
 .empty-state {

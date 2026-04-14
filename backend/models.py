@@ -36,6 +36,12 @@ class BaseModel:
         doc = self.collection.find_one({'email': email.lower().strip()})
         return serialize_doc(doc)
     
+    def find_by_phone(self, phone):
+        if not phone:
+            return None
+        doc = self.collection.find_one({'phone': phone.strip()})
+        return serialize_doc(doc)
+    
     def update(self, id_str, data):
         data['updated_at'] = datetime.utcnow()
         result = self.collection.update_one(
@@ -310,6 +316,8 @@ class PackageModel(BaseModel):
     
     def __init__(self, db):
         super().__init__(db, self.COLLECTION)
+        self.collection.create_index('is_active')
+        self.collection.create_index('is_featured')
     
     def create(self, data, admin_id):
         duration_weeks = int(data.get('duration_weeks', 4))
@@ -362,6 +370,26 @@ class PackageModel(BaseModel):
         return super().find_by_id(package_id)
     
     def express_interest(self, package_id, client_id, client_name):
+        # Enforce single selection: remove previous interests for this client
+        self.db.package_interests.delete_many({'client_id': str(client_id)})
+        
+        # Also remove from the old inline list if any (though we are moving to package_interests collection)
+        self.collection.update_many(
+            {'interested_clients.client_id': str(client_id)},
+            {'$pull': {'interested_clients': {'client_id': str(client_id)}}}
+        )
+
+        interest = {
+            'package_id': str(package_id),
+            'client_id': str(client_id),
+            'client_name': client_name,
+            'status': 'pending',
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow()
+        }
+        self.db.package_interests.insert_one(interest)
+        
+        # Also keep the inline list for backward compatibility if needed, but only for this package
         self.collection.update_one(
             {'_id': ObjectId(package_id)},
             {'$addToSet': {
@@ -387,6 +415,9 @@ class SessionModel(BaseModel):
         super().__init__(db, self.COLLECTION)
         self.collection.create_index([('client_id', 1), ('scheduled_at', -1)])
         self.collection.create_index([('trainer_id', 1), ('scheduled_at', -1)])
+        self.collection.create_index([('status', 1)])
+        self.collection.create_index([('client_id', 1), ('status', 1)])
+        self.collection.create_index([('trainer_id', 1), ('status', 1)])
     
     def create(self, data, admin_id):
         # Parse scheduled_at
@@ -600,7 +631,8 @@ class NotificationModel(BaseModel):
     def __init__(self, db):
         super().__init__(db, self.COLLECTION)
         self.collection.create_index([('user_id', 1), ('created_at', -1)])
-        self.collection.create_index([('read', 1)])
+        self.collection.create_index([('user_id', 1), ('read', 1)])
+        self.collection.create_index('read')
     
     def create(self, user_id, title, message, ntype='info', link=None, metadata=None):
         """Create notification for specific user"""
@@ -945,6 +977,13 @@ class SubscriptionModel(BaseModel):
         docs = list(self.collection.find({'status': 'active'}).sort('enrolled_at', -1))
         return [serialize_doc(d) for d in docs]
 
+    def get_for_client(self, client_id):
+        """Get current subscription for client (even if recently completed/inactive)"""
+        return serialize_doc(self.collection.find_one(
+            {'client_id': str(client_id)},
+            sort=[('enrolled_at', -1)]
+        ))
+
     def count(self, filter_dict=None):
         return self.collection.count_documents(filter_dict or {})
 
@@ -1106,35 +1145,24 @@ def get_all_interests(self):
 # Add this method to the PackageModel class in models.py
 
 def express_interest(self, package_id, client_id, client_name):
-    """Record a client's interest in a package"""
+    """Record a client's interest in a package - ENFORCES SINGLE SELECTION"""
     try:
+        # 1. Clear previous interests for this client
+        self.db.package_interests.delete_many({'client_id': str(client_id)})
+        
         interest = {
-            'package_id': package_id,
-            'client_id': client_id,
+            'package_id': str(package_id),
+            'client_id': str(client_id),
             'client_name': client_name,
             'status': 'pending',
             'created_at': datetime.utcnow(),
             'updated_at': datetime.utcnow()
         }
         
-        # Check if already expressed interest
-        existing = self.db.package_interests.find_one({
-            'package_id': package_id,
-            'client_id': client_id
-        })
-        
-        if existing:
-            # Update existing
-            self.db.package_interests.update_one(
-                {'_id': existing['_id']},
-                {'$set': {'updated_at': datetime.utcnow()}}
-            )
-            return existing
-        else:
-            # Create new
-            result = self.db.package_interests.insert_one(interest)
-            interest['_id'] = str(result.inserted_id)
-            return interest
+        # 2. Create new
+        result = self.db.package_interests.insert_one(interest)
+        interest['_id'] = str(result.inserted_id)
+        return interest
     except Exception as e:
         logger.error(f"Error in express_interest: {e}")
         return None
